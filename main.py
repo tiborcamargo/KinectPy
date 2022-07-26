@@ -1,9 +1,5 @@
 import os
-import copy
 import time
-import pandas as pd
-import numpy as np
-import open3d as o3d
 from preprocessing.extractor import MKVFilesProcessing
 from preprocessing.data import DataProcessor
 
@@ -31,10 +27,10 @@ if __name__ == '__main__':
                                    NUMBER_OF_JOINTS) 
     
     # Extract pointclouds, color, depths, skeleton from the MKV file
-    extractor.extract(pointcloud=True, skeleton=True)
+    #extractor.extract(pointcloud=True, skeleton=True)
 
-    data_processor = DataProcessor(MKV_OUTPUT_DIRS)
+    #data_processor = DataProcessor(MKV_OUTPUT_DIRS)
 
     # Aligning skeletons after registration has been done
-    #extractor.align_skeletons()
+    extractor.align_skeletons()
     print(f'It took {round(time.time() - start, 2)} seconds to process {len(MKV_INPUT_FILES)} MKV files.')

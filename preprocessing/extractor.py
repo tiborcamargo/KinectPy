@@ -1,7 +1,5 @@
 import os
-import cv2
 import sys
-import copy
 import logging
 import subprocess
 import numpy as np
@@ -10,8 +8,7 @@ import open3d as o3d
 from pathlib import Path
 from typing import List, Union
 from utils.processing import (
-    find_correspondent_frames_between_folders, scale_point_cloud,
-    sort_filenames_by_timestamp, remove_files_not_synced, sync_skeleton_and_pointcloud
+    remove_files_not_synced, sync_skeleton_and_pointcloud
     )
 
 logging.basicConfig(level=logging.INFO)
@@ -94,7 +91,9 @@ class MKVFilesProcessing(object):
         for output_dir in self.output_dirs:
 
             # Load and synchronize point cloud and skeleton timestamps
-            synced_skeleton = sync_skeleton_and_pointcloud(output_dir)
+            #synced_skeleton = sync_skeleton_and_pointcloud(output_dir)
+            synced_skeleton = pd.read_csv(os.path.join(output_dir, 'skeleton', 'synced_positions_3d.csv'), 
+                                          index_col='timestamp')
 
             # Load transformation from the registration algorithm
             device = os.path.basename(os.path.normpath(output_dir))
