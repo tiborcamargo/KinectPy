@@ -1,0 +1,78 @@
+import imghdr
+import os
+import cv2
+import copy
+import logging
+import numpy as np
+import open3d as o3d
+import tensorflow as tf
+from PIL import Image
+
+
+class Filtering:
+    def __init__(self, frozen_graph_fp, pbtxt_fp):
+        self.net = self._load_segmentation_model(frozen_graph_fp, pbtxt_fp)
+
+    def _load_segmentation_model(self, frozen_graph_fp, pbtxt_fp):
+        lib_dir = os.getcwd()
+        if not frozen_graph_fp:
+            frozen_graph_fp = os.path.join(lib_dir, 'data', 'frozen_inference_graph.pb')
+        if not pbtxt_fp:
+            pbtxt_fp = os.path.join(lib_dir, 'data', 'mask_rcnn_inception_v2_coco_2018_01_28.pbtxt') 
+        
+        assert os.path.isfile(frozen_graph_fp), "Invalid path to mask-rcnn frozen graph"
+        assert os.path.isfile(pbtxt_fp), "Invalid path to mask-rcnn pbtxt"
+
+        net = cv2.dnn.readNetFromTensorflow(frozen_graph_fp, pbtxt_fp)
+        return net
+
+
+    def apply_segmentation(self, img):
+        """ 
+        It will apply a segmentation model where the class
+        representing a human is labeled as 15, but I will convert it to 255 
+    
+        Args:
+            img (np.array): filepath to image    
+        Returns:
+            segmentation map
+        """
+        blob = cv2.dnn.blobFromImage(img, swapRB=True)
+
+        self.net.setInput(blob)
+        boxes, masks = self.net.forward(['detection_out_final', 'detection_masks'])
+
+        black_image = np.zeros_like(img)
+        height, width, _ = img.shape
+        detected_boxes = boxes.shape[2]
+
+        for i in range(detected_boxes):
+            # Selecting the i-th box
+            box = boxes[0, 0, i] 
+            class_id = int(box[1])
+            score = box[2]
+
+            if score >= 0.5:
+                # Getting box coordinates
+                x1 = int(box[3] * width)
+                y1 = int(box[4] * height)
+                x2 = int(box[5] * width)
+                y2 = int(box[6] * height)
+
+                roi = black_image[y1:y2, x1:x2]
+                roi_height, roi_width, _ = roi.shape
+
+                # Selecting the mask associated to ith box
+                mask = masks[i, class_id]
+                mask = cv2.resize(mask, (roi_width, roi_height))
+                mask[mask < 0.1] = 0
+                mask[mask >= 0.1] = 255
+
+                # Get mask coordinates
+                contours, _ = cv2.findContours(np.array(mask, np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                for cnt in contours:
+                    cv2.fillPoly(roi, [cnt], (255, 255, 255))
+     
+        mask_idx = np.argwhere(black_image != 255)
+        img[mask_idx[:, 0], mask_idx[:, 1], mask_idx[:, 2]] = black_image[mask_idx[:, 0], mask_idx[:, 1], mask_idx[:, 2]]
+        return img
