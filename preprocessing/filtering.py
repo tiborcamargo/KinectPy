@@ -38,10 +38,10 @@ class Filtering:
             segmentation map
         """
         blob = cv2.dnn.blobFromImage(img, swapRB=True)
-
         self.net.setInput(blob)
         boxes, masks = self.net.forward(['detection_out_final', 'detection_masks'])
 
+        person_id = 0
         black_image = np.zeros_like(img)
         height, width, _ = img.shape
         detected_boxes = boxes.shape[2]
@@ -52,7 +52,8 @@ class Filtering:
             class_id = int(box[1])
             score = box[2]
 
-            if score >= 0.5:
+            if class_id == person_id and score >= 0.5:
+
                 # Getting box coordinates
                 x1 = int(box[3] * width)
                 y1 = int(box[4] * height)

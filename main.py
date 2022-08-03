@@ -9,28 +9,33 @@ OFFLINE_PROCESSOR_PATH = os.path.join(
         'Azure-Kinect-Extractor', 'build', 'bin', 'Debug', 'offline_processor.exe'
         )
 
-MKV_INPUT_FILES = [
-    'F:/Kinect_data_19052022/debug/cmj_new/master_1.mkv',
-    'F:/Kinect_data_19052022/debug/cmj_new/sub_1.mkv',
-    #'F:/Kinect_data_19052022/debug/cmj_new/sub_2.mkv',
-]
-
-MKV_OUTPUT_DIRS = [x.replace('.mkv', '') for x in MKV_INPUT_FILES]
-
-NUMBER_OF_JOINTS = 32
+NUMBER_OF_JOINTS = 32 
 
 if __name__ == '__main__':
+
+    MKV_EXPERIMENTS_DIR = [
+        'F:/1E2DB6/',
+        'F:/4AD6F3',
+        'F:/4B8AF1',
+        'F:/5E373E',
+    ]
+
     start = time.time()
-    extractor = MKVFilesProcessing(MKV_INPUT_FILES, 
-                                   MKV_OUTPUT_DIRS, 
-                                   OFFLINE_PROCESSOR_PATH,
-                                   NUMBER_OF_JOINTS) 
+    for experiment_dir in MKV_EXPERIMENTS_DIR:
+
+        mkv_input_files = [os.path.join(experiment_dir, 'master_1.mkv'), os.path.join(experiment_dir, 'sub_1.mkv')]
+        mkv_output_dirs = [x.replace('.mkv', '') for x in mkv_input_files]
+
+        extractor = MKVFilesProcessing(mkv_input_files, 
+                                       mkv_output_dirs, 
+                                       OFFLINE_PROCESSOR_PATH,
+                                       NUMBER_OF_JOINTS) 
     
-    # Extract pointclouds, color, depths, skeleton from the MKV file
-    #extractor.extract(pointcloud=True, skeleton=True)
+        # Extract pointclouds, color,depths, skeleton from the MKV file
+        extractor.extract(pointcloud=False, skeleton=True)
 
-    #data_processor = DataProcessor(MKV_OUTPUT_DIRS)
+        #data_processor = DataProcessor(mkv_output_dirs)
 
-    # Aligning skeletons after registration has been done
-    extractor.align_skeletons()
-    print(f'It took {round(time.time() - start, 2)} seconds to process {len(MKV_INPUT_FILES)} MKV files.')
+        # Aligning skeletons after registration has been done
+        extractor.align_skeletons() 
+        print(f'It took {round(time.time() - start, 2)} seconds to process {len(mkv_input_files)} MKV files.')

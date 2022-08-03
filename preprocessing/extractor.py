@@ -8,7 +8,7 @@ import open3d as o3d
 from pathlib import Path
 from typing import List, Union
 from utils.processing import (
-    remove_files_not_synced, sync_skeleton_and_pointcloud
+    synchronize_filenames, remove_files_not_synced, sync_skeleton_and_pointcloud
     )
 
 logging.basicConfig(level=logging.INFO)
@@ -82,7 +82,7 @@ class MKVFilesProcessing(object):
 
         remove_files_not_synced(self.output_dirs)
         sync_skeleton_and_pointcloud(self.output_dirs, save_csv=True)
-
+        print('\n')
         logging.info('Extraction is done!')
 
 
@@ -131,6 +131,7 @@ class MKVFilesProcessing(object):
         pcd_dir = os.path.join(output_dir, 'pointclouds')
         depths_dir = pcd_dir.replace('pointclouds', 'depths')
         color_dir = pcd_dir.replace('pointclouds', 'color')
+
         for filename in os.listdir(pcd_dir):
             src_fp = os.path.join(pcd_dir, filename)
 

@@ -1,5 +1,6 @@
 import os
 import cv2
+import logging
 import numpy as np
 import pandas as pd
 import open3d as o3d
@@ -25,9 +26,12 @@ class DataProcessor:
         self.number_of_devices = len(self.device_filenames_df.columns)
         self.registration_transformations = []
         self._find_registration_transforms()
+        logging.info('Starting to filter background and save filtered point clouds')
         self.segmentation = Filtering('F:/frozen_inference_graph.pb', 
                                       'F:/mask_rcnn_inception_v2_coco_2018_01_28.pbtxt')
         for file_idx in range(len(self.device_filenames_df)):
+            if (file_idx+1)%50 == 0:
+                print(f'{file_idx} point clouds have been saved')
             filtered_pcds = self._filter_pointclouds_and_save(file_idx)
             registered_pcd_points = []
             registered_pcd_colors = []
@@ -147,8 +151,8 @@ class DataProcessor:
 
         # Select non-black pixels and within a distance of +- 200 cm from the median depth
         valid_pixels = (reshaped_color[:, 0] != 0) & (reshaped_color[:, 1] != 0) & (reshaped_color[:, 2] != 0)
-        valid_depths = (depth_img[:, 2] <= np.median(depth_img[:, 2]) + 2000) | \
-                       (depth_img[:, 2] <= np.median(depth_img[:, 2]) - 2000)
+        valid_depths = (depth_img[:, 2] <= np.median(depth_img[:, 2]) + 750) | \
+                       (depth_img[:, 2] <= np.median(depth_img[:, 2]) - 750)
 
         # Filter out black pixels and invalid depths
         reshaped_color = reshaped_color[(valid_pixels) & (valid_depths)]

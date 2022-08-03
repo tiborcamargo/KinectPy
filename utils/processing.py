@@ -246,7 +246,7 @@ def sync_skeleton_and_pointcloud(
             saved_fp = os.path.join(root_dir, 'skeleton', 'synced_positions_3d.csv')
             synced_pcd_skeleton.to_csv(saved_fp, index=True)
         
-        return synced_pcd_skeleton
+    return synced_pcd_skeleton
         
 
 def select_points_randomly(
