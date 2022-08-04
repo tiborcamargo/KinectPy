@@ -29,25 +29,32 @@ class DataProcessor:
         logging.info('Starting to filter background and save filtered point clouds')
         self.segmentation = Filtering('F:/frozen_inference_graph.pb', 
                                       'F:/mask_rcnn_inception_v2_coco_2018_01_28.pbtxt')
+
         for file_idx in range(len(self.device_filenames_df)):
+
             if (file_idx+1)%50 == 0:
-                print(f'{file_idx} point clouds have been saved')
+                print(f'{file_idx+1} point clouds have been saved')
+
             filtered_pcds = self._filter_pointclouds_and_save(file_idx)
-            registered_pcd_points = []
-            registered_pcd_colors = []
+            registered_pcd_points, registered_pcd_colors = [], []
             registered_pcd = o3d.geometry.PointCloud()
-            for device_idx in range(self.number_of_devices):
-                # Registering master and sub devices
-                if device_idx == 0:
-                    registered_pcd = filtered_pcds[device_idx]
-                else:
-                    registered_pcd.transform(self.registration_transformations[device_idx-1])
-                # Retrieving their point
+
+            for device_idx in range(len(filtered_pcds)):
+
+                registered_pcd = filtered_pcds[device_idx]
+                if device_idx > 0:
+                    registered_pcd.transform(self.registration_transformations[device_idx - 1])
+
+                # Retrieving their points and colors
                 registered_pcd_points.append(np.asarray(registered_pcd.points))
                 registered_pcd_colors.append(np.asarray(registered_pcd.colors))
+
             # Transforming to o3d vector
             registered_pcd_points = o3d.utility.Vector3dVector(np.vstack(registered_pcd_points))
             registered_pcd_colors = o3d.utility.Vector3dVector(np.vstack(registered_pcd_colors))
+            registered_pcd.points = registered_pcd_points
+            registered_pcd.colors = registered_pcd_colors
+
             registered_and_filtered_pcd_fp = os.path.join(
                 self.device_filenames_df.columns[0], 
                 'filtered_and_registered_pointclouds', 
@@ -76,9 +83,12 @@ class DataProcessor:
         following the structure:
         [filtered_master_pcd, filtered_sub_1_pcd, filtered_sub_2_pcd, ...]
         """
+
         filtered_pointclouds = []
+
         # Create master device point cloud
         master_root_dir = self.device_filenames_df.columns[0]
+
         # For each timestamp, filter image, save to pointcloud and then save
         master_color_fp = os.path.join(master_root_dir, 'color', self.device_filenames_df.iloc[file_idx][0])
         master_depth_fp = os.path.join(master_root_dir, 'depths', self.device_filenames_df.iloc[file_idx][0])
@@ -90,7 +100,7 @@ class DataProcessor:
         master_pcd = self._transform_filtered_image_to_pointcloud(master_filtered_img, master_depth)
         filtered_pointclouds.append(master_pcd)
         
-        # For each sub device
+        # For each sub device, do the same
         for device_idx in range(1, self.number_of_devices):
             # Create sub device point cloud
             sub_root_dir = self.device_filenames_df.columns[device_idx]
@@ -123,7 +133,6 @@ class DataProcessor:
         master_color = self._load_color(master_color_fp)
         master_depth = self._load_depth(master_depth_fp)
         master_pcd = self._rgbd_to_pointcloud(master_color, master_depth)
-        
         
         for device_idx in range(1, self.number_of_devices):
             

@@ -102,7 +102,9 @@ class MKVFilesProcessing(object):
                                                  f'transformation_master_{device}.npy')
                 sub_transform = np.load(transformation_fp)
             else:
-                sub_transform = np.identity(4)
+                transformation_fp = os.path.join(self.output_dirs[0], 
+                                                 f'transformation_master_sub_1.npy')
+                sub_transform = np.load(transformation_fp)
 
             rotation = sub_transform[:3, :3]
             translation = sub_transform[:3, 3]
