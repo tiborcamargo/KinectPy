@@ -1,5 +1,4 @@
 # Usage example: python visualize.py -d "F:/4AD6F3" -s
-
 import os
 import open3d as o3d
 import pandas as pd
@@ -12,6 +11,7 @@ parser = ArgumentParser()
 parser.add_argument("-d", "--dir", help="root directory", type=str)
 parser.add_argument("-s", "--skeleton", help="display skeleton", action='store_true')
 args = parser.parse_args()
+
 
 if __name__ == '__main__':
     
