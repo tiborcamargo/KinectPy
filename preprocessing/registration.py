@@ -62,7 +62,30 @@ def execute_global_registration(
     return ransac_transformation
 
 
-def execute_local_registration(pcd_master, pcd_sub, initial_transformation):
+def execute_point_to_plane_registration(
+    pcd_master: o3d.geometry.PointCloud, 
+    pcd_sub: o3d.geometry.PointCloud, 
+    initial_transformation: np.ndarray, 
+    voxel_size: int = 35
+    ) -> np.ndarray:
+    print('Starting local registration refinement')
+
+    source = copy.deepcopy(pcd_master)
+    target = copy.deepcopy(pcd_sub)
+    threshold = 100
+
+    _, _, source_down, target_down, _, _ = prepare_dataset(source, target, voxel_size)
+    reg_p2l = o3d.pipelines.registration.registration_icp(
+        source_down, 
+        target_down, 
+        threshold, 
+        initial_transformation,
+        o3d.pipelines.registration.TransformationEstimationPointToPlane()
+    )
+        
+    return reg_p2l.transformation
+
+def execute_colored_ICP_registration(pcd_master, pcd_sub, initial_transformation):
     logging.info('Starting local registration refinement')
 
     source = copy.deepcopy(pcd_master)

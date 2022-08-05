@@ -4,10 +4,10 @@ import logging
 import numpy as np
 import pandas as pd
 import open3d as o3d
+from typing import List
 from preprocessing.filtering import Filtering
 from utils.processing import sort_filenames_by_timestamp
-from preprocessing.registration import execute_global_registration, execute_local_registration
-from typing import List
+from preprocessing.registration import execute_global_registration, execute_point_to_plane_registration
 
 
 class DataProcessor:
@@ -147,7 +147,7 @@ class DataProcessor:
                
             # Apply registration and save the transformation matrix
             initial_transformation = execute_global_registration(master_pcd, sub_pcd)
-            local_transformation = execute_local_registration(master_pcd, sub_pcd, initial_transformation)
+            local_transformation = execute_point_to_plane_registration(master_pcd, sub_pcd, initial_transformation)
             transformation_dst = os.path.join(self.device_filenames_df.columns[0],
                                              f'transformation_master_sub_{device_idx}.npy')
             np.save(transformation_dst, local_transformation)
