@@ -1,5 +1,6 @@
 import os
 import copy
+import shutil
 import numpy as np
 import pandas as pd
 import open3d as o3d
@@ -266,3 +267,26 @@ def select_points_randomly(
     pcd_points = pcd_points[sampled_idx]
     pcd_colors = None
     return pcd_points
+
+
+def remove_useless_dirs(root_dir):
+    """ 
+    Remove the color, depths, pointclouds and filtered_pointclouds directories,
+    since they are not used after filtering/registration/alignment
+    """
+    for device in ['master_1', 'sub_1']:
+        dirs_to_remove = [
+            os.path.join(root_dir, device, 'color'),
+            os.path.join(root_dir, device, 'depths'),
+            os.path.join(root_dir, device, 'pointclouds'),
+            os.path.join(root_dir, device, 'filtered_pointclouds')
+        ]
+
+        # Try to remove, if it does not exist just ignore
+        for folder in dirs_to_remove:
+            print(folder)
+            try:
+                shutil.rmtree(folder)
+            except:
+                pass
+    return
