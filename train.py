@@ -49,6 +49,7 @@ MASTER_ROOT_DIRS = [
 
 BATCH_SIZE = 16
 EPOCHS = 50
+THRESHOLD = 100 # in milimeters
 JOINTS = ['FOOT_LEFT', 'FOOT_RIGHT', 
           'ANKLE_LEFT', 'ANKLE_RIGHT',
           'KNEE_LEFT', 'KNEE_RIGHT',
@@ -91,17 +92,28 @@ if __name__ == '__main__':
                         outputs=outputs, 
                         name="pointnet")
 
+
     model.compile(loss='mean_squared_error',
                   optimizer=keras.optimizers.Adam(learning_rate=0.005),
-                  metrics=[percentual_correct_keypoints])
+                  metrics=[percentual_correct_keypoints(threshold=THRESHOLD)])
 
 
     cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath='./checkpoints', 
                                                      verbose=1, 
                                                      save_weights_only=True,
                                                      save_freq=int((0.7*kinect_dataset.dataset_size)//BATCH_SIZE*5))
+
+
+    def scheduler(epoch, lr):
+      if epoch < 10:
+        return lr
+      else:
+        return lr * tf.math.exp(-0.1)
+
+    lr_callback = tf.keras.callbacks.LearningRateScheduler(scheduler, verbose=0)
+
     model.fit(train_ds, 
-          epochs=15, 
-          validation_data=val_ds, 
-          steps_per_epoch=(0.7*kinect_dataset.dataset_size)//BATCH_SIZE,
-          callbacks=cp_callback)
+              epochs=15, 
+              validation_data=val_ds, 
+              steps_per_epoch=(0.7*kinect_dataset.dataset_size)//BATCH_SIZE,
+              callbacks=[cp_callback, lr_callback])
