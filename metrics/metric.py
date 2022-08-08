@@ -10,6 +10,7 @@ def percentual_correct_keypoints(y_true, y_pred, threshold=150):
     value = tf.math.reduce_mean(numerator)
     return value
 
+
 #class PercentualCorrectKeypoints(tf.keras.metrics.Metric):
 #    """
 #    Computes the PCK metric using a user-defined threshold. 
