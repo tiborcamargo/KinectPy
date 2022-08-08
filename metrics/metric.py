@@ -3,12 +3,14 @@ import tensorflow as tf
 from typing import Union
 
 
-def percentual_correct_keypoints(y_true, y_pred, threshold=150):
-    y_true = tf.cast(y_true, tf.float32)
-    y_pred = tf.cast(y_pred, tf.float32)
-    numerator = tf.where(tf.abs(y_pred - y_true) <= threshold, x=1.0, y=0.0)
-    value = tf.math.reduce_mean(numerator)
-    return value
+def percentual_correct_keypoints(threshold=150):
+    def loss(y_true, y_pred):
+        y_true = tf.cast(y_true, tf.float32)
+        y_pred = tf.cast(y_pred, tf.float32)
+        numerator = tf.where(tf.abs(y_pred - y_true) <= threshold, x=1.0, y=0.0)
+        value = tf.math.reduce_mean(numerator)
+        return value
+    return loss
 
 
 #class PercentualCorrectKeypoints(tf.keras.metrics.Metric):
