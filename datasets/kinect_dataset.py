@@ -45,9 +45,12 @@ class KinectDataset:
         """
         # Dataset size will be increased when calling tf.data.Dataset.from_generator
         self.dataset_size = 0
-        output_types = (tf.float32, tf.float32)
-        number_of_joints = len(joints)
-        output_shapes = ((None, number_of_points, 3), (None, number_of_joints*3))
+        self.batch_size = batch_size
+        self.joints = joints
+        self.output_types = (tf.float32, tf.float32)
+        self.number_of_joints = len(joints)
+        self.number_of_points = number_of_points
+        self.output_shapes = ((None, self.number_of_points, 3), (None, self.number_of_joints*3))
         
         for i in range(len(master_root_dirs)):
             filenames = os.listdir(os.path.join(master_root_dirs[i], 'filtered_and_registered_pointclouds'))
@@ -55,9 +58,9 @@ class KinectDataset:
 
             tf_dataset = tf.data.Dataset.from_generator(
                     self._pointcloud_skeleton_tf_generator, 
-                    args= [master_root_dirs[i], batch_size, number_of_points, joints],
-                    output_types = output_types,
-                    output_shapes = output_shapes
+                    args= [master_root_dirs[i], self.batch_size, self.number_of_points, self.joints],
+                    output_types = self.output_types,
+                    output_shapes = self.output_shapes
                     )
 
             # Concatenate all folders in one unique generator
@@ -78,11 +81,11 @@ class KinectDataset:
         joints: List[str]
         ):
         """
-    
-        master_root_dir: Directory with master pointclouds, skeleton and other data
-        batch_size: Size of batches when consuming the generator
-        number_of_points: Downsampling a pointclod to use *number_of_points*
-        number_of_joints: How many joints is used for the RGBD device
+        Args:
+            master_root_dir: Directory with master pointclouds, skeleton and other data
+            batch_size: Size of batches when consuming the generator
+            number_of_points: Downsampling a pointclod to use *number_of_points*
+            number_of_joints: How many joints is used for the RGBD device
         """
         pcd_dir =  tf.io.gfile.join(master_root_dir.decode('utf-8'), 'filtered_and_registered_pointclouds')
         file_list =  tf.io.gfile.listdir(pcd_dir)
@@ -126,7 +129,11 @@ class KinectDataset:
         return self.dataset
     
     
-    def _select_joints(self, joints_list, skeleton_dataframe):
+    def _select_joints(
+        self, 
+        joints_list: List[str], 
+        skeleton_dataframe: pd.DataFrame
+        ):
         """ 
         Given a list of joints, select columns in the dataframe accordingly.
         This function is used because the name of the column might differ 
