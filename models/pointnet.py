@@ -50,3 +50,26 @@ def tnet(inputs, num_features):
     feat_T = layers.Reshape((num_features, num_features))(x)
     # Apply affine transformation to input features
     return layers.Dot(axes=(2, 1))([inputs, feat_T])
+
+
+def create_pointnet(number_of_points: int, number_of_joints: int):
+    """ Creates the PointNet architecture """
+    inputs = keras.Input(shape=(number_of_points, 3))
+
+    x = tnet(inputs, 3)
+    x = conv_bn(x, 32)
+    x = conv_bn(x, 32)
+    x = tnet(x, 32)
+    x = conv_bn(x, 32)
+    x = conv_bn(x, 64)
+    x = conv_bn(x, 512)
+    x = layers.GlobalMaxPooling1D()(x)
+    x = dense_bn(x, 256)
+    x = layers.Dropout(0.3)(x)
+    x = dense_bn(x, 128)
+    x = layers.Dropout(0.3)(x)
+
+    num_classes = number_of_joints*3
+    outputs = layers.Dense(num_classes)(x)
+    model = keras.Model(inputs=inputs, outputs=outputs, name="pointnet")
+    return model
