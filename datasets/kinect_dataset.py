@@ -170,9 +170,9 @@ class KinectDataset:
         """
         assert train_size + val_size + test_size == 1
     
-        train_size = int(0.7 * self.dataset_size)
-        val_size = int(0.15 * self.dataset_size)
-        test_size = int(0.15 * self.dataset_size)
+        train_size = int(train_size * self.dataset_size)
+        val_size = int(val_size * self.dataset_size)
+        test_size = int(test_size * self.dataset_size)
     
         train_dataset = self.dataset.take(train_size)
         test_dataset = self.dataset.skip(train_size)
