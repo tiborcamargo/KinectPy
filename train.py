@@ -28,30 +28,30 @@ logger = logging.getLogger(__name__)
 np.set_printoptions(suppress=True)
 tf.random.set_seed(1234)
 # TO-DO: Change the Project name using some argument parser
-wandb.init(project="KinectPy", name="first_try")
+wandb.init(project="KinectPy", name="overfit_attempt_1024_points")
 
 
 MASTER_ROOT_DIRS = [
     'D:/azure_kinect/1E2DB6/02/master_1/',
     'D:/azure_kinect/4AD6F3/01/master_1/', 'D:/azure_kinect/4AD6F3/02/master_1/',
     'D:/azure_kinect/4B8AF1/01/master_1/', 'D:/azure_kinect/4B8AF1/02/master_1/',
-    #'D:/azure_kinect/5E373E/01/master_1/', 'D:/azure_kinect/5E373E/02/master_1/',
-    #'D:/azure_kinect/20E29D/01/master_1',
-    #'D:/azure_kinect/37A7AA/01/master_1', 
-    #'D:/azure_kinect/76ABFD/01/master_1', 
-    #'D:/azure_kinect/339F94/01/master_1', 
-    #'D:/azure_kinect/471EF1/01/master_1',
-    #'D:/azure_kinect/857F1E/01/master_1', 'D:/azure_kinect/857F1E/03/master_1', 
-    #'D:/azure_kinect/927394/01/master_1',
-    #'D:/azure_kinect/AEBA3A/01/master_1',
-    #'D:/azure_kinect/AFCD31/01/master_1',
-    #'D:/azure_kinect/C47EFC/01/master_1',
-    #'D:/azure_kinect/CCB8AD/01/master_1',
-    #'D:/azure_kinect/EEFE6D/01/master_1', 
-    #'D:/azure_kinect/F205FE/01/master_1', 'D:/azure_kinect/F205FE/02/master_1', 
+    'D:/azure_kinect/5E373E/01/master_1/', 'D:/azure_kinect/5E373E/02/master_1/',
+    'D:/azure_kinect/20E29D/01/master_1',
+    'D:/azure_kinect/37A7AA/01/master_1', 
+    'D:/azure_kinect/76ABFD/01/master_1', 
+    'D:/azure_kinect/339F94/01/master_1', 
+    'D:/azure_kinect/471EF1/01/master_1',
+    'D:/azure_kinect/857F1E/01/master_1', 'D:/azure_kinect/857F1E/03/master_1', 
+    'D:/azure_kinect/927394/01/master_1',
+    'D:/azure_kinect/AEBA3A/01/master_1',
+    'D:/azure_kinect/AFCD31/01/master_1',
+    'D:/azure_kinect/C47EFC/01/master_1',
+    'D:/azure_kinect/CCB8AD/01/master_1',
+    'D:/azure_kinect/EEFE6D/01/master_1', 
+    #'D:/azure_kinect/F205FE/01/master_1', 'D:/azure_kinect/F205FE/02/master_1',  # <- This will be my test dataset
     ]
 
-EPOCHS = 25
+EPOCHS = 50
 BATCH_SIZE = 16
 TRAIN_SIZE = 0.9
 VAL_SIZE = 0.1
@@ -63,23 +63,11 @@ JOINTS = ['FOOT_LEFT', 'FOOT_RIGHT',
           'HIP_LEFT', 'HIP_RIGHT',
           'PELVIS']
 NUMBER_OF_JOINTS = len(JOINTS)
-NUMBER_OF_POINTS = 128
+NUMBER_OF_POINTS = 1024
 THRESHOLD = 50
 OUTPUT_TYPES = (tf.float32, tf.float32)
 
-wandb.config = {
-    "learning_rate": STARTING_LR,
-    "sampling_points": NUMBER_OF_POINTS,
-    "number_of_joints": NUMBER_OF_JOINTS,
-    "epochs": EPOCHS,
-    "batch_size": BATCH_SIZE,
-    "threshold_pck": THRESHOLD,
-    "joints": JOINTS,
-    "train_size": TRAIN_SIZE,
-    "val_size": VAL_SIZE,
-    "test_size": TEST_SIZE,
-    "datasets": MASTER_ROOT_DIRS,
-}
+
 
 if __name__ == '__main__':
 
@@ -92,6 +80,21 @@ if __name__ == '__main__':
     train_ds, test_ds, val_ds = kinect_dataset.split_train_test_val(train_size=TRAIN_SIZE, 
                                                                     val_size=VAL_SIZE, 
                                                                     test_size=TEST_SIZE)
+
+    wandb.config = {
+        "learning_rate": STARTING_LR,
+        "sampling_points": NUMBER_OF_POINTS,
+        "number_of_joints": NUMBER_OF_JOINTS,
+        "epochs": EPOCHS,
+        "batch_size": BATCH_SIZE,
+        "threshold_pck": THRESHOLD,
+        "joints": JOINTS,
+        "train_size": TRAIN_SIZE,
+        "val_size": VAL_SIZE,
+        "test_size": TEST_SIZE,
+        "datasets": MASTER_ROOT_DIRS,
+        "dataset_fullsize": kinect_dataset.dataset_size
+    }
     
     # Create model
     model = create_pointnet(NUMBER_OF_POINTS, NUMBER_OF_JOINTS)
@@ -101,7 +104,7 @@ if __name__ == '__main__':
                   metrics=[percentual_correct_keypoints(threshold=THRESHOLD)])
 
 
-    cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath='checkpoints', 
+    cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath='./checkpoints/', 
                                                      verbose=1, 
                                                      save_weights_only=True,
                                                      save_freq='epoch')
@@ -120,8 +123,8 @@ if __name__ == '__main__':
     model.fit(train_ds, 
               epochs=EPOCHS, 
               validation_data=val_ds, 
-              steps_per_epoch=(0.7*kinect_dataset.dataset_size)//BATCH_SIZE,
-              validation_steps=(0.15*kinect_dataset.dataset_size)//BATCH_SIZE,
+              steps_per_epoch=(TRAIN_SIZE*kinect_dataset.dataset_size)//BATCH_SIZE,
+              validation_steps=(VAL_SIZE*kinect_dataset.dataset_size)//BATCH_SIZE,
               callbacks=[cp_callback, lr_callback, WandbCallback()])
 
     wandb.tensorflow.log(tf.summary.create_file_writer('logs/tf_experiments'))
