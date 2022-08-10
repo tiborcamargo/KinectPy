@@ -299,5 +299,5 @@ def statistical_outlier_removal(pcd, nb_neighbors: int = 200, std_ratio: float =
     procedure that involves Oriented Bounding Boxes
     """
     voxel_down_pcd = pcd.voxel_down_sample(voxel_size=0.02)
-    cloud, outlier_idx = voxel_down_pcd.remove_statistical_outlier(nb_neighbors, std_ratio)
-    return cloud.select_by_index(outlier_idx, invert=False)
+    filtered_cloud, outlier_idx = voxel_down_pcd.remove_statistical_outlier(nb_neighbors, std_ratio)
+    return filtered_cloud
