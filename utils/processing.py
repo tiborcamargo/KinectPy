@@ -310,8 +310,7 @@ def normalize_pointcloud(
     ) -> o3d.geometry.PointCloud:
     """ 
     Given a point set P = {(x1,y1,z1), ..., (xN,yN,zN)}, 
-    ensures that all points are linearly set to the range
-    of [-1, 1]
+    ensures that all points are linearly set to the range [min_range, max_range]
     """
     arr = np.asarray(pcd.points)
     scaled_unit = (max_range - min_range) / (np.max(arr) - np.min(arr))
