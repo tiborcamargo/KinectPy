@@ -301,3 +301,21 @@ def statistical_outlier_removal(pcd, nb_neighbors: int = 200, std_ratio: float =
     voxel_down_pcd = pcd.voxel_down_sample(voxel_size=0.02)
     filtered_cloud, outlier_idx = voxel_down_pcd.remove_statistical_outlier(nb_neighbors, std_ratio)
     return filtered_cloud
+
+
+def normalize_pointcloud(
+    pcd: o3d.geometry.PointCloud, 
+    min_range: float = -1.0, 
+    max_range: float = 1.0
+    ) -> o3d.geometry.PointCloud:
+    """ 
+    Given a point set P = {(x1,y1,z1), ..., (xN,yN,zN)}, 
+    ensures that all points are linearly set to the range
+    of [-1, 1]
+    """
+    arr = np.asarray(pcd.points)
+    scaled_unit = (max_range - min_range) / (np.max(arr) - np.min(arr))
+    scaled_points = arr*scaled_unit - np.min(arr)*scaled_unit + min_range
+    pcd.points = o3d.utility.Vector3dVector(scaled_points)
+    return pcd
+
