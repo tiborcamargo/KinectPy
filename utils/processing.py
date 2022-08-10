@@ -290,3 +290,14 @@ def remove_useless_dirs(root_dir):
             except:
                 pass
     return
+
+
+def statistical_outlier_removal(pcd, nb_neighbors: int = 200, std_ratio: float = 3.0):
+    """ 
+    Applies a statistical outlier removal for the Point Cloud `pcd`.
+    This method is specially useful to be applied before using any 
+    procedure that involves Oriented Bounding Boxes
+    """
+    voxel_down_pcd = pcd.voxel_down_sample(voxel_size=0.02)
+    cloud, outlier_idx = voxel_down_pcd.remove_statistical_outlier(nb_neighbors, std_ratio)
+    return cloud.select_by_index(outlier_idx, invert=False)
