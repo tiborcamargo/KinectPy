@@ -8,7 +8,8 @@ from PyMoCapViewer import MoCapViewer
 
 def visualize_predictions(
     x: Union[tf.Tensor, np.ndarray], 
-    y: Union[tf.Tensor, np.ndarray],
+    y_label: Union[tf.Tensor, np.ndarray, None] = None,
+    y_pred: Union[tf.Tensor, np.ndarray, None] = None,
     frequency: int = 10
     ) -> None:
     """ 
@@ -25,12 +26,19 @@ def visualize_predictions(
         pcd.paint_uniform_color([0, 0, 0])
         pcds.append(pcd)
 
-    # Generate joints
-    columns = np.array([[f'joint_{i}x', f'joint_{i}y', f'joint_{i}z'] for i in range(y.shape[1]//3)]).flatten()
-    skeleton = pd.DataFrame(y, columns=columns)
-    
     # Visualizer
     viewer = MoCapViewer(grid_axis=None, sampling_frequency=frequency)
     viewer.add_point_cloud_animation(pcds)
-    viewer.add_skeleton(skeleton)
+    
+    # Generate joints
+    if y_label:
+        columns = np.array([[f'joint_{i}x', f'joint_{i}y', f'joint_{i}z'] for i in range(y_label.shape[1]//3)]).flatten()
+        skeleton_gt = pd.DataFrame(y_label, columns=columns)
+        viewer.add_skeleton(skeleton_gt, color='green')
+
+    if y_pred:
+        columns = np.array([[f'joint_{i}x', f'joint_{i}y', f'joint_{i}z'] for i in range(y_pred.shape[1]//3)]).flatten()
+        skeleton_pred = pd.DataFrame(y_pred, columns=columns)
+        viewer.add_skeleton(skeleton_pred, color='red')
+        
     viewer.show_window()
