@@ -16,18 +16,20 @@ def visualize_predictions(
     and its corresponding set of joint poses y.shape (n_batches, m_joints*3)
     returns the skeleton + point cloud visualization 
     """
+
+    # Generate point clouds
     pcds = []
-    skeleton = {}
     for batch_idx in range(x.shape[0]):
         pcd = o3d.geometry.PointCloud()
         pcd.points = o3d.utility.Vector3dVector(x[batch_idx, :, :].numpy())
         pcd.paint_uniform_color([0, 0, 0])
         pcds.append(pcd)
 
+    # Generate joints
     columns = np.array([[f'joint_{i}x', f'joint_{i}y', f'joint_{i}z'] for i in range(y.shape[1]//3)]).flatten()
     skeleton = pd.DataFrame(y, columns=columns)
     
-
+    # Visualizer
     viewer = MoCapViewer(grid_axis=None, sampling_frequency=frequency)
     viewer.add_point_cloud_animation(pcds)
     viewer.add_skeleton(skeleton)
