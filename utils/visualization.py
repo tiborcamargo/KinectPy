@@ -31,12 +31,12 @@ def visualize_predictions(
     viewer.add_point_cloud_animation(pcds)
     
     # Generate joints
-    if y_label:
+    if type(y_label) != type(None):
         columns = np.array([[f'joint_{i}x', f'joint_{i}y', f'joint_{i}z'] for i in range(y_label.shape[1]//3)]).flatten()
         skeleton_gt = pd.DataFrame(y_label, columns=columns)
         viewer.add_skeleton(skeleton_gt, color='green')
 
-    if y_pred:
+    if type(y_pred) != type(None):
         columns = np.array([[f'joint_{i}x', f'joint_{i}y', f'joint_{i}z'] for i in range(y_pred.shape[1]//3)]).flatten()
         skeleton_pred = pd.DataFrame(y_pred, columns=columns)
         viewer.add_skeleton(skeleton_pred, color='red')
