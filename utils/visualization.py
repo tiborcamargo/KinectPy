@@ -22,7 +22,11 @@ def visualize_predictions(
     pcds = []
     for batch_idx in range(x.shape[0]):
         pcd = o3d.geometry.PointCloud()
-        pcd.points = o3d.utility.Vector3dVector(x[batch_idx, :, :].numpy())
+        if type(x) == type(np.array([])):
+            points = x[batch_idx, :, :]
+        else:
+            points = x[batch_idx, :, :].numpy()
+        pcd.points = o3d.utility.Vector3dVector(points)
         pcd.paint_uniform_color([0, 0, 0])
         pcds.append(pcd)
 
