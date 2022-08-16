@@ -5,7 +5,11 @@ sys.path.append('..')
 from options.joints import POSSIBLE_JOINTS
 
 
-def parse_args(print_config=True):
+def parse_args(print_config: bool = True) -> dict:
+    """ 
+    Argument parser that receives a config file but can be overriden
+    by arguments passed via command line.
+    """
     parser = argparse.ArgumentParser(description=__doc__, add_help=False)
     
     parser.add_argument(
@@ -127,6 +131,7 @@ def parse_args(print_config=True):
 
     return config
 
+
 def print_arguments(config: dict):
     print_args = 100*'-' + '\n'
     for key, value in config.items():
@@ -134,7 +139,3 @@ def print_arguments(config: dict):
     print_args += 100*'-' + '\n'
     print(print_args)
     return print_args
-
-
-if __name__ == '__main__':
-    config = parse_args(print_config=True)
