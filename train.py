@@ -1,3 +1,4 @@
+from ast import parse
 import wandb
 import logging
 import pandas as pd
@@ -12,6 +13,9 @@ from datasets.kinect_dataset import KinectDataset
 from metrics.metric import percentual_correct_keypoints
 from wandb.keras import WandbCallback
 
+from configs.argparser import parse_args
+
+args = parse_args()
 tf.random.set_seed(1234)
 
 try:
@@ -28,27 +32,27 @@ logger = logging.getLogger(__name__)
 np.set_printoptions(suppress=True)
 tf.random.set_seed(1234)
 # TO-DO: Change the Project name using some argument parser
-wandb.init(project="KinectPy", name="overfit_attempt_1024_points")
+wandb.init(project="KinectPy", name="overfit_attempt_4096_points_multiple_joints")
 
 
 MASTER_ROOT_DIRS = [
-    'D:/azure_kinect/1E2DB6/02/master_1/',
+    'D:/azure_kinect/1E2DB6/01/master_1/', 'D:/azure_kinect/1E2DB6/02/master_1/',
     'D:/azure_kinect/4AD6F3/01/master_1/', 'D:/azure_kinect/4AD6F3/02/master_1/',
-    'D:/azure_kinect/4B8AF1/01/master_1/', 'D:/azure_kinect/4B8AF1/02/master_1/',
-    'D:/azure_kinect/5E373E/01/master_1/', 'D:/azure_kinect/5E373E/02/master_1/',
-    'D:/azure_kinect/20E29D/01/master_1',
-    'D:/azure_kinect/37A7AA/01/master_1', 
-    'D:/azure_kinect/76ABFD/01/master_1', 
-    'D:/azure_kinect/339F94/01/master_1', 
+    'D:/azure_kinect/4B8AF1/01/master_1/', 'D:/azure_kinect/4B8AF1/02/master_1/', 'D:/azure_kinect/4B8AF1/03/master_1/', 'D:/azure_kinect/4B8AF1/04/master_1/',
+    'D:/azure_kinect/5E373E/01/master_1/', 'D:/azure_kinect/5E373E/02/master_1/', 'D:/azure_kinect/5E373E/03/master_1/',
+    'D:/azure_kinect/20E29D/01/master_1/', 'D:/azure_kinect/20E29D/02/master_1',  'D:/azure_kinect/20E29D/03/master_1',
+    'D:/azure_kinect/37A7AA/02/master_1/', 'D:/azure_kinect/37A7AA/03/master_1/', 'D:/azure_kinect/37A7AA/04/master_1/',
+    #'D:/azure_kinect/76ABFD/02/master_1', 
+    'D:/azure_kinect/339F94/01/master_1', 'D:/azure_kinect/339F94/02/master_1',
     'D:/azure_kinect/471EF1/01/master_1',
     'D:/azure_kinect/857F1E/01/master_1', 'D:/azure_kinect/857F1E/03/master_1', 
     'D:/azure_kinect/927394/01/master_1',
     'D:/azure_kinect/AEBA3A/01/master_1',
     'D:/azure_kinect/AFCD31/01/master_1',
-    'D:/azure_kinect/C47EFC/01/master_1',
+    #'D:/azure_kinect/C47EFC/01/master_1',
     'D:/azure_kinect/CCB8AD/01/master_1',
-    'D:/azure_kinect/EEFE6D/01/master_1', 
-    #'D:/azure_kinect/F205FE/01/master_1', 'D:/azure_kinect/F205FE/02/master_1',  # <- This will be my test dataset
+    #'D:/azure_kinect/EEFE6D/01/master_1', 
+    'D:/azure_kinect/F205FE/01/master_1', 'D:/azure_kinect/F205FE/02/master_1/', 
     ]
 
 EPOCHS = 50
@@ -56,14 +60,14 @@ BATCH_SIZE = 16
 TRAIN_SIZE = 0.9
 VAL_SIZE = 0.1
 TEST_SIZE = 0
-STARTING_LR = 5e-3
+STARTING_LR = 5e-2
 JOINTS = ['FOOT_LEFT', 'FOOT_RIGHT', 
           'ANKLE_LEFT', 'ANKLE_RIGHT',
           'KNEE_LEFT', 'KNEE_RIGHT',
           'HIP_LEFT', 'HIP_RIGHT',
           'PELVIS']
 NUMBER_OF_JOINTS = len(JOINTS)
-NUMBER_OF_POINTS = 1024
+NUMBER_OF_POINTS = 4096
 THRESHOLD = 50
 OUTPUT_TYPES = (tf.float32, tf.float32)
 
@@ -95,6 +99,7 @@ if __name__ == '__main__':
         "datasets": MASTER_ROOT_DIRS,
         "dataset_fullsize": kinect_dataset.dataset_size
     }
+    wandb.log(wandb.config)
     
     # Create model
     model = create_pointnet(NUMBER_OF_POINTS, NUMBER_OF_JOINTS)
@@ -128,3 +133,18 @@ if __name__ == '__main__':
               callbacks=[cp_callback, lr_callback, WandbCallback()])
 
     wandb.tensorflow.log(tf.summary.create_file_writer('logs/tf_experiments'))
+
+    # Save results
+    val_loss = 0
+    val_pck = 0
+    num_of_batches = 1
+    for x_test, y_test in val_ds.take(10):
+        y_pred = model.predict(x_test)
+        loss, pck = model.evaluate(x_test, y_test)
+        val_loss += loss
+        val_pck += pck
+        num_of_batches += 1
+    
+    mean_val_loss = val_loss/num_of_batches
+    mean_val_pck = val_pck/num_of_batches
+    logging.info("Mean loss, Mean PCK:" + str(mean_val_loss) + ', ' + str(mean_val_pck))

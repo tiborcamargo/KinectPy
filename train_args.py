@@ -57,6 +57,7 @@ if __name__ == '__main__':
     wandb.config = configs
     wandb.config['dataset_fullsize'] = kinect_dataset.dataset_size
     wandb.config['file_dirs'] = MASTER_ROOT_DIRS 
+    wandb.log(configs)
     
     # Create model and compile
     model = create_pointnet(configs['sampling_points'], len(configs['joints']))
@@ -71,14 +72,14 @@ if __name__ == '__main__':
     suffix = str(now.year) + '{:02d}'.format(now.month) + '' + '{:02d}'.format(now.day) 
     ckpt_dir = os.path.join(
         configs['checkpoint_dir'], configs['name'], configs['name'] + '_' + suffix
-    )
+        )
 
     cp_callback = tf.keras.callbacks.ModelCheckpoint(
         filepath=ckpt_dir, 
         verbose=1, 
         save_weights_only=True,
         save_freq='epoch'
-    )
+        )
 
     def scheduler(epoch, lr):
         if epoch < 10:
