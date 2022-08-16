@@ -1,5 +1,6 @@
 import os
 import cv2
+import copy
 import logging
 import numpy as np
 import pandas as pd
@@ -13,7 +14,9 @@ from preprocessing.registration import execute_global_registration, execute_poin
 class DataProcessor:
     def __init__(
         self, 
-        output_dirs: List[str]
+        output_dirs: List[str],
+        mask_rcnn_pb_file: str,
+        mask_rcnn_pbtxt_file: str,
         ):
         """
         Finds a registration matrix between master and sub devices, 
@@ -27,9 +30,8 @@ class DataProcessor:
         self.registration_transformations = []
         self._find_registration_transforms()
         logging.info('Starting to filter background and save filtered point clouds')
-        self.segmentation = Filtering('F:/frozen_inference_graph.pb', 
-                                      'F:/mask_rcnn_inception_v2_coco_2018_01_28.pbtxt')
-
+        self.segmentation = Filtering(mask_rcnn_pb_file, mask_rcnn_pbtxt_file)
+      
         for file_idx in range(len(self.device_filenames_df)):
 
             if (file_idx+1)%50 == 0:
@@ -49,18 +51,39 @@ class DataProcessor:
                 registered_pcd_points.append(np.asarray(registered_pcd.points))
                 registered_pcd_colors.append(np.asarray(registered_pcd.colors))
 
-            # Transforming to o3d vector
-            registered_pcd_points = o3d.utility.Vector3dVector(np.vstack(registered_pcd_points))
-            registered_pcd_colors = o3d.utility.Vector3dVector(np.vstack(registered_pcd_colors))
+            # Transforming to o3d vector, using np.float64 accelerates numpy to o3d vector
+            registered_pcd_points = o3d.utility.Vector3dVector(np.vstack(registered_pcd_points).astype(np.float64))
+            registered_pcd_colors = o3d.utility.Vector3dVector(np.vstack(registered_pcd_colors).astype(np.float64))
             registered_pcd.points = registered_pcd_points
             registered_pcd.colors = registered_pcd_colors
 
+            # Remove outliers from registered pcd
+            registered_pcd = self._filter_outliers(registered_pcd)
+
+            # Save to disk
             registered_and_filtered_pcd_fp = os.path.join(
                 self.device_filenames_df.columns[0], 
                 'filtered_and_registered_pointclouds', 
                 self.device_filenames_df.iloc[file_idx][0]
-            )
+                )
             o3d.io.write_point_cloud(registered_and_filtered_pcd_fp + '.pcd', registered_pcd)
+
+
+    def _filter_outliers(
+        self, 
+        pcd: o3d.geometry.PointCloud,
+        nb_neighbors: int = 200, 
+        std_ratio: float = 3.0,
+        voxel_size: float = 0.02
+        ) -> o3d.geometry.PointCloud:
+        """ 
+        Applies a statistical outlier removal for the Point Cloud `pcd`.
+        This method is specially useful to be applied before using any 
+        procedure that involves Oriented Bounding Boxes
+        """
+        voxel_down_pcd = copy.deepcopy(pcd).voxel_down_sample(voxel_size)
+        cloud, _  = voxel_down_pcd.remove_statistical_outlier(nb_neighbors, std_ratio)
+        return cloud
 
 
     def _create_device_filenames_df(self, output_dirs):
@@ -123,7 +146,7 @@ class DataProcessor:
         saving the transformations to disk
         """
 
-        # Finding registratoin matrix based on the 0-th image 
+        # Finding registration matrix based on the 0-th image 
         file_idx = 0
         # Create master device point cloud
         master_root_dir = self.device_filenames_df.columns[0]
@@ -194,16 +217,16 @@ class DataProcessor:
         of rgb = [0, 0, 0], since many of them are invalid
         """
         pcd = o3d.geometry.PointCloud()
-        pcd.points = o3d.utility.Vector3dVector(depth_img)
-        pcd.colors = o3d.utility.Vector3dVector(color_img.reshape(-1, 3) / 255)
+        pcd.points = o3d.utility.Vector3dVector(depth_img.astype(np.float64))
+        pcd.colors = o3d.utility.Vector3dVector(color_img.astype(np.float64).reshape(-1, 3) / 255)
         
         # removing black color
         points = np.asarray(pcd.points)
         colors = np.asarray(pcd.colors)
 
         non_black_idx = (points[:, 0] != 0) & (points[:, 1] != 0) & (points[:, 2] != 0)
-        valid_points = points[non_black_idx]
-        valid_colors = colors[non_black_idx]
+        valid_points = points[non_black_idx].astype(np.float64)
+        valid_colors = colors[non_black_idx].astype(np.float64)
 
         pcd.points = o3d.utility.Vector3dVector(valid_points)
         pcd.colors = o3d.utility.Vector3dVector(valid_colors)

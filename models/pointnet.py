@@ -53,7 +53,10 @@ def tnet(inputs, num_features):
 
 
 def create_pointnet(number_of_points: int, number_of_joints: int):
-    """ Creates the PointNet architecture """
+    """ 
+    Creates the PointNet architecture which uses only the classification
+    path and ignores the concatenation between local and global features
+    """
     inputs = keras.Input(shape=(number_of_points, 3))
 
     x = tnet(inputs, 3)

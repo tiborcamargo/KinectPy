@@ -269,6 +269,7 @@ def select_points_randomly(
     return pcd_points
 
 
+# TODO: Remove useless dirs for ALL devices
 def remove_useless_dirs(root_dir):
     """ 
     Remove the color, depths, pointclouds and filtered_pointclouds directories,
@@ -318,3 +319,30 @@ def normalize_pointcloud(
     pcd.points = o3d.utility.Vector3dVector(scaled_points)
     return pcd
 
+
+def obb_normalization(
+    points: np.ndarray, 
+    joints: np.ndarray, 
+    number_of_joints: int
+    ) -> Tuple[np.ndarray, np.ndarray]:
+    """ 
+    Retrieves the center and the orientation of an Oriented Bounding Box 
+    to normalize point clouds
+    """
+    # Create temp pcd to retrieve OBB translation + rotation
+    tmp_pcd = o3d.geometry.PointCloud(points=o3d.utility.Vector3dVector(points))
+    
+    # Retrieve rotation and translation
+    obb = tmp_pcd.get_oriented_bounding_box()
+    obb_rot = obb.R
+    obb_trans = obb.get_center()
+
+    # Normalize points
+    obb_normalized_points = (points - obb_trans)@obb_rot
+    
+    # Normalize joints
+    joints_3d = joints.values.reshape((number_of_joints, 3))
+    obb_normalized_joints = (joints_3d - obb_trans)@obb_rot
+    obb_normalized_joints = obb_normalized_joints.reshape((number_of_joints*3))
+    
+    return obb_normalized_points, obb_normalized_joints
