@@ -11,4 +11,7 @@ Currently a personal project, it will be available as a PyPi project around 12/2
 
 ## Dependencies
 
+If you are using this software for point cloud processing after MKV extraction:
+* Mask R-CNN is used for human segmentation, please [download Mask R-CNN weights and configuration here](https://drive.google.com/drive/folders/1lBcEwQ45tMbKLQOJxIykWy2D5roPO4cH). Do not forget to pass the path to the `.pb` and `.pbtxt` accordingly in the `extract.py`.
+
 ## Installation
