@@ -103,17 +103,22 @@ class KinectDataset:
                 i = 0
                 np.random.shuffle(file_list)
             else:
+
                 file_chunk = file_list[i*batch_size:(i+1)*batch_size] 
                 pointcloud_points = []
                 skeleton_positions = []
+
                 for file in file_chunk:
+
                     # Retrieving timestamps to get skeletons positions
                     timestamp = int(file[:-4])
                     skeleton_positions.append(skeleton_df.loc[timestamp].values)
+
                     # Reading point cloud and sampling
                     pcd = o3d.io.read_point_cloud(os.path.join(pcd_dir, file))
                     pcd_points = select_points_randomly(pcd, number_of_points)
                     pointcloud_points.append(pcd_points)
+
                 # Reshaping points 
                 pointcloud_points = np.asarray(pointcloud_points)
                 pointcloud_points = pointcloud_points.reshape(-1, number_of_points, 3) 
@@ -133,7 +138,7 @@ class KinectDataset:
         self, 
         joints_list: List[str], 
         skeleton_dataframe: pd.DataFrame
-        ):
+        ) -> List[str]:
         """ 
         Given a list of joints, select columns in the dataframe accordingly.
         This function is used because the name of the column might differ 
@@ -141,6 +146,9 @@ class KinectDataset:
             eg: joints_list = ['PELVIS']
             skelet_dataframe.columns
             >> ['PELVIS (x)', 'PELVIS (y)', 'PELVIS (z)']
+
+        Attention: The order always remains the same, independent 
+        of the joints_list ordering!
         """
         joint_cols = []
         for col in skeleton_dataframe.columns:
@@ -149,12 +157,11 @@ class KinectDataset:
                     joint_cols.append(col)
         return joint_cols
 
-
-    def split_train_test_val(
+    
+    def split_train_val(
         self,
-        train_size: int = 0.7,
-        val_size: int = 0.15,
-        test_size: int = 0.15,
+        train_split: int = 0.7,
+        val_split: int = 0.15,
         shuffle: bool = True,
         ) -> List[tf.data.Dataset]:
         """
@@ -163,23 +170,27 @@ class KinectDataset:
         Args:
             train_size: Percentual of dataset to be used as training
             val_size: Percentual of dataset to be used as validation
-            test_size: Percentual of dataset to be used as test
         
         Returns:
             (train_dataset, validation_dataset, test_dataset)
         """
-        assert train_size + val_size + test_size == 1
+        assert abs(1 - (train_split + val_split )) < 1e-15, 'The percentual of training and validation should equal to 1' 
+        assert val_split != 0, 'If you do not want to use validation, pass self.dataset instead'
+
+        if shuffle:
+            self.dataset = self.dataset.shuffle(self.dataset_size)
     
-        train_size = int(train_size * self.dataset_size)
-        val_size = int(val_size * self.dataset_size)
-        test_size = int(test_size * self.dataset_size)
+        train_size = int(train_split * self.dataset_size)
+        val_size = int(val_split * self.dataset_size)
+        
+        print('Train size:', train_size)
+        print('Val size:', val_size)
     
         train_dataset = self.dataset.take(train_size)
-        test_dataset = self.dataset.skip(train_size)
-        val_dataset = self.dataset.skip(val_size)
-        test_dataset = self.dataset.take(test_size)
+        remaining = self.dataset.skip(train_size)
+        val_dataset = remaining.take(val_size)
 
-        return train_dataset, val_dataset, test_dataset
+        return train_dataset, val_dataset 
 
 
     def visualize_dataset(
@@ -188,6 +199,7 @@ class KinectDataset:
         ):
         pcds = []
         skeleton = []
+
         for data in self.dataset.take(number_of_batches):
             points, skeletons = data
             for j in range(len(points)):
@@ -202,31 +214,3 @@ class KinectDataset:
         viewer.add_point_cloud_animation(pcds)
         viewer.add_skeleton(skeleton)
         viewer.show_window()
-
-
-#if __name__ == '__main__':
-#
-#    MASTER_ROOT_DIRS = [
-#        'D:/azure_kinect/1E2DB6/02/master_1/',
-#        'D:/azure_kinect/4AD6F3/01/master_1/', 'D:/azure_kinect/4AD6F3/02/master_1/',
-#        'D:/azure_kinect/4B8AF1/01/master_1/', 'D:/azure_kinect/4B8AF1/02/master_1/',
-#        'D:/azure_kinect/5E373E/01/master_1/', 'D:/azure_kinect/5E373E/02/master_1/',
-#        ]
-#
-#    BATCH_SIZE = 16
-#    JOINTS = ['FOOT_LEFT', 'FOOT_RIGHT', 'ANKLE_LEFT', 'ANKLE_RIGHT', 
-#              'KNEE_LEFT', 'KNEE_RIGHT', 'HIP_LEFT', 'HIP_RIGHT', 'PELVIS']
-#    NUMBER_OF_JOINTS = len(JOINTS)
-#    NUMBER_OF_POINTS = 1024*8
-#
-#    kinect_dataset = KinectDataset(master_root_dirs=MASTER_ROOT_DIRS, batch_size=32)
-#    dataset = kinect_dataset.dataset
-#    train_ds, test_ds, val_ds = kinect_dataset.split_train_test_val(train_size=0.7, val_size=0.15, test_size=0.15)
-#
-#    for train_data in train_ds.take(1):
-#        points, skeleton = train_data
-#        print(f'Points: {points.shape}')
-#        print(f'Skeleton: {skeleton.shape}')
-#        break
-#
-#    kinect_dataset.visualize_dataset(2)
