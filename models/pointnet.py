@@ -17,17 +17,22 @@ def dense_bn(x, filters):
 
 
 class OrthogonalRegularizer(keras.regularizers.Regularizer):
-    def __init__(self, num_features, l2reg=0.001):
+    def __init__(self, num_features, l2reg=0.001, **kwargs):
         self.num_features = num_features
         self.l2reg = l2reg
         self.eye = tf.eye(num_features)
-
+            
     def __call__(self, x):
         x = tf.reshape(x, (-1, self.num_features, self.num_features))
         xxt = tf.tensordot(x, x, axes=(2, 2))
         xxt = tf.reshape(xxt, (-1, self.num_features, self.num_features))
         return tf.reduce_sum(self.l2reg * tf.square(xxt - self.eye))
 
+    def get_config(self):
+        config = {
+            "l2reg": self.l2reg,
+        }
+        return config
 
 def tnet(inputs, num_features):
 
