@@ -1,13 +1,12 @@
+# Experiment nomenclatures
 project: 'TestProject'
 name: 'FirstExperiment'
 
-joints: ['FOOT_LEFT', 'FOOT_RIGHT']
-sampling_points: 2048 
+# Training parameters
+joints: ['PELVIS', 'HIP_LEFT', 'HIP_RIGHT']
+sampling_points: 1024
 train_size: 0.9
 val_size: 0.1
-test_size: 0
-
-# Training parameters
 epochs: 30
 batch_size: 16
 learning_rate: 0.0005
@@ -15,10 +14,13 @@ loss: 'mean_squared_error'
 
 # Evaluation
 metrics: 'percentual_correct_keypoints'
-threshold: 100
+threshold: 50
 
 # Checkpoint parameters
 checkpoint_dir: './checkpoints'
 
 # Logging root
 logs_dir: './logs'
+
+# Dataset
+datasets: ['D:/azure_kinect/AEBA3A/02', 'D:/azure_kinect/AEBA3A/03']

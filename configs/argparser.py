@@ -36,6 +36,13 @@ def parse_args(print_config: bool = True) -> dict:
         help='experiment name for reproducibility purposes',
         type=str,
     )
+
+    parser.add_argument(
+        '-d', '--dataset',
+        help='list of root directories, eg: path/to/master_1, which contains filtered_and_registered_pointclouds dir',
+        type=str,
+        nargs='+',
+    )
     
     parser.add_argument(
         '--sampling_points',
