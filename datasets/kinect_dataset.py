@@ -53,7 +53,8 @@ class KinectDataset:
         self.output_shapes = ((None, self.number_of_points, 3), (None, self.number_of_joints*3))
         
         for i in range(len(master_root_dirs)):
-            filenames = os.listdir(os.path.join(master_root_dirs[i], 'filtered_and_registered_pointclouds'))
+            pcd_dir = os.path.join(master_root_dirs[i], 'filtered_and_registered_pointclouds')
+            filenames = os.listdir(pcd_dir)
             self.dataset_size += len(filenames)
 
             tf_dataset = tf.data.Dataset.from_generator(
@@ -162,7 +163,6 @@ class KinectDataset:
         self,
         train_split: int = 0.7,
         val_split: int = 0.15,
-        shuffle: bool = True,
         ) -> List[tf.data.Dataset]:
         """
         Given a tensorflow dataset, return a split with train, test and validation datasets
@@ -176,9 +176,6 @@ class KinectDataset:
         """
         assert abs(1 - (train_split + val_split )) < 1e-15, 'The percentual of training and validation should equal to 1' 
         assert val_split != 0, 'If you do not want to use validation, pass self.dataset instead'
-
-        if shuffle:
-            self.dataset = self.dataset.shuffle(self.dataset_size)
     
         train_size = int(train_split * self.dataset_size)
         val_size = int(val_split * self.dataset_size)
