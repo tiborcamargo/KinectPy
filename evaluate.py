@@ -1,4 +1,5 @@
 import os
+import csv
 import logging
 import numpy as np
 import tensorflow as tf
@@ -23,11 +24,13 @@ if __name__ == '__main__':
     # Read arguments
     configs = parse_args(print_config=True)
 
-    if configs['datasets']:
-        TEST_ROOT_DIRS = configs['datasets']
+    if configs['test_dataset']:
+        TEST_ROOT_DIRS = configs['test_dataset']
 
-    # # Create model and compile
+    # Create model and compile
     model = create_pointnet(configs['sampling_points'], len(configs['joints']))
+
+    print(configs['checkpoint_dir'])
     model.load_weights(configs['checkpoint_dir'])
     model.compile(
         loss=configs['loss'],
@@ -35,7 +38,7 @@ if __name__ == '__main__':
         metrics=percentual_correct_keypoints(configs['threshold'])
     )
 
-    # # Import dataset
+    # Import dataset
     test_dataset = KinectDataset(
         master_root_dirs=TEST_ROOT_DIRS, 
         batch_size=configs['batch_size'],
@@ -43,7 +46,18 @@ if __name__ == '__main__':
         joints=configs['joints']
     )
 
+    # Evaluate
     test_loss, test_metric = model.evaluate(test_dataset(), steps=test_dataset.dataset_size)
 
-    logging.info("Mean loss, Mean PCK:" + str(test_loss) + ', ' + str(test_metric))
-    print("Mean loss, Mean PCK:" + str(test_loss) + ', ' + str(test_metric))
+    # Save and print evaluation
+    result_message = f"PCK@{configs['threshold']}: Mean loss = {str(test_loss)}, Mean PCK = {str(test_metric)}" 
+    evaluation_fp = os.path.join(
+        configs['checkpoint_dir'], 
+        f"evaluation_{configs['project']}_{configs['name']}.txt"
+        )
+
+    with open (evaluation_fp, 'a') as filedata:                            
+        filedata.write(result_message + '\n')
+
+    logging.info(result_message)
+    print(result_message)

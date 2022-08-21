@@ -38,8 +38,15 @@ def parse_args(print_config: bool = True) -> dict:
     )
 
     parser.add_argument(
-        '-d', '--dataset',
+        '-d', '--train_dataset',
         help='list of root directories, eg: path/to/master_1, which contains filtered_and_registered_pointclouds dir',
+        type=str,
+        nargs='+',
+    )
+
+    parser.add_argument(
+        '--test_dataset',
+        help='list of test root directories, eg: path/to/master_1, which contains filtered_and_registered_pointclouds dir',
         type=str,
         nargs='+',
     )

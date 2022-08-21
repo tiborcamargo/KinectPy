@@ -6,6 +6,7 @@ import numpy as np
 import tensorflow as tf
 from pathlib import Path
 from tensorflow import keras
+from evaluate import TEST_ROOT_DIRS
 from models.pointnet import create_pointnet
 from datasets.kinect_dataset import KinectDataset
 from metrics.metric import percentual_correct_keypoints
@@ -26,30 +27,13 @@ logging.basicConfig(
 
 wandb.init(project=configs['project'], name=configs['name'])
 
-# MASTER_ROOT_DIRS = [
-#     'D:/azure_kinect/1E2DB6/01/master_1/', 'D:/azure_kinect/1E2DB6/02/master_1/', 'D:/azure_kinect/1E2DB6/04/master_1/', 'D:/azure_kinect/1E2DB6/05/master_1/', 'D:/azure_kinect/1E2DB6/06/master_1/',
-#     'D:/azure_kinect/4AD6F3/01/master_1/', 'D:/azure_kinect/4AD6F3/02/master_1/', 'D:/azure_kinect/4AD6F3/03/master_1/', 'D:/azure_kinect/4AD6F3/04/master_1/', 'D:/azure_kinect/4AD6F3/12/master_1/',
-#     'D:/azure_kinect/4B8AF1/01/master_1/', 'D:/azure_kinect/4B8AF1/02/master_1/', 'D:/azure_kinect/4B8AF1/03/master_1/', 'D:/azure_kinect/4B8AF1/04/master_1/',
-#     'D:/azure_kinect/5E373E/01/master_1/', 'D:/azure_kinect/5E373E/02/master_1/', 'D:/azure_kinect/5E373E/03/master_1/',
-#     'D:/azure_kinect/20E29D/01/master_1/', 'D:/azure_kinect/20E29D/02/master_1',  'D:/azure_kinect/20E29D/03/master_1', 'D:/azure_kinect/20E29D/04/master_1',
-#     'D:/azure_kinect/37A7AA/02/master_1/', 'D:/azure_kinect/37A7AA/03/master_1/', 'D:/azure_kinect/37A7AA/04/master_1/',
-#     'D:/azure_kinect/339F94/01/master_1', 'D:/azure_kinect/339F94/02/master_1','D:/azure_kinect/339F94/03/master_1','D:/azure_kinect/339F94/04/master_1',
-#     'D:/azure_kinect/471EF1/01/master_1','D:/azure_kinect/471EF1/02/master_1','D:/azure_kinect/471EF1/04/master_1',
-#     'D:/azure_kinect/857F1E/01/master_1', 'D:/azure_kinect/857F1E/03/master_1', 'D:/azure_kinect/857F1E/04/master_1',
-#     'D:/azure_kinect/927394/01/master_1','D:/azure_kinect/927394/02/master_1','D:/azure_kinect/927394/03/master_1',
-#     'D:/azure_kinect/AEBA3A/01/master_1',
-#     'D:/azure_kinect/AFCD31/03/master_1', # all others have bad registration so far
-#     'D:/azure_kinect/F205FE/01/master_1', 'D:/azure_kinect/F205FE/02/master_1/', 
-# ]
 
-MASTER_ROOT_DIRS = [
-    'D:/azure_kinect/debug2/master_1'
+MASTER_ROOT_DIRS = configs['train_dataset']
+
+TEST_ROOT_DIRS = [
+    'D:/azure_kinect/76ABFD/03/master_1', 'D:/azure_kinect/76ABFD/04/master_1', 
+    'D:/azure_kinect/CCB8AD/01/master_1', 
 ]
-
-# TEST_ROOT_DIRS = [
-#     'D:/azure_kinect/76ABFD/03/master_1', 'D:/azure_kinect/76ABFD/04/master_1', 
-#     'D:/azure_kinect/CCB8AD/01/master_1', 
-# ]
 
 if __name__ == '__main__':
 
@@ -109,6 +93,9 @@ if __name__ == '__main__':
         validation_data=val_ds, 
         callbacks=[cp_callback, lr_callback, WandbCallback()]
     )
+
+    # if configs['load_checkpoints']:
+        # model.load_weights(configs['checkpoint_dir'])
 
     wandb.tensorflow.log(
         tf.summary.create_file_writer(os.path.join(configs['logs_dir'], 'tf_experiments'))
