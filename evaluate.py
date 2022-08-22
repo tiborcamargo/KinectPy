@@ -8,6 +8,7 @@ from models.pointnet import create_pointnet
 from datasets.kinect_dataset import KinectDataset
 from metrics.metric import percentual_correct_keypoints
 from configs.argparser import parse_args 
+from options.normalization import normalization_options
 np.set_printoptions(suppress=True)
 tf.random.set_seed(1234)
 
@@ -46,8 +47,15 @@ if __name__ == '__main__':
         joints=configs['joints']
     )
 
+    if configs['normalization'] != '':
+        test_dataset_size = test_dataset.dataset_size
+        test_dataset = test_dataset().map(normalization_options[configs['normalization']])
+
+        test_loss, test_metric = model.evaluate(test_dataset, steps=test_dataset_size)
+    else:
+        test_loss, test_metric = model.evaluate(test_dataset(), steps=test_dataset.dataset_size)
+
     # Evaluate
-    test_loss, test_metric = model.evaluate(test_dataset(), steps=test_dataset.dataset_size)
 
     # Save and print evaluation
     result_message = f"PCK@{configs['threshold']}: Mean loss = {str(test_loss)}, Mean PCK = {str(test_metric)}" 

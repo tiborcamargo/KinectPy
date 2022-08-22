@@ -12,8 +12,10 @@ from datasets.kinect_dataset import KinectDataset
 from metrics.metric import percentual_correct_keypoints
 from wandb.keras import WandbCallback
 from configs.argparser import parse_args 
+from options.normalization import normalization_options
 np.set_printoptions(suppress=True)
 tf.random.set_seed(1234)
+
 
 configs = parse_args(print_config=True)
 # Logging options
@@ -51,6 +53,10 @@ if __name__ == '__main__':
         train_split=configs['train_size'], 
         val_split=configs['val_size'], 
     )
+
+    if configs['normalization'] != '':
+        train_ds = train_ds.map(normalization_options[configs['normalization']])
+        val_ds = val_ds.map(normalization_options[configs['normalization']])
 
     # Passing configs to wandb
     wandb.config = configs

@@ -50,6 +50,12 @@ def parse_args(print_config: bool = True) -> dict:
         type=str,
         nargs='+',
     )
+
+    parser.add_argument(
+        '--normalization',
+        help='normalization method',
+        type=str,
+    )
     
     parser.add_argument(
         '--sampling_points',
