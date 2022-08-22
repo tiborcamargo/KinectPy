@@ -1,0 +1,54 @@
+project: 'August'
+name: 'all_joints_1024points_vanillapointnet_obb_normalization'
+
+joints: ['ANKLE_LEFT', 'ANKLE_RIGHT', 'CLAVICLE_LEFT', 'CLAVICLE_RIGHT',  
+       'EAR_LEFT', 'EAR_RIGHT', 'ELBOW_LEFT', 'ELBOW_RIGHT', 'EYE_LEFT',
+       'EYE_RIGHT', 'FOOT_LEFT', 'FOOT_RIGHT', 'HANDTIP_LEFT',
+       'HANDTIP_RIGHT', 'HAND_LEFT', 'HAND_RIGHT', 'HEAD', 'HIP_LEFT',  
+       'HIP_RIGHT', 'KNEE_LEFT', 'KNEE_RIGHT', 'NECK', 'NOSE', 'PELVIS',
+       'SHOULDER_LEFT', 'SHOULDER_RIGHT', 'SPINE_CHEST', 'THUMB_LEFT',  
+       'THUMB_RIGHT', 'WRIST_LEFT', 'WRIST_RIGHT']
+
+sampling_points: 1024
+train_size: 0.95
+val_size: 0.05
+
+# Training parameters
+epochs: 5
+batch_size: 16
+learning_rate: 0.0005
+loss: 'mean_squared_error'
+
+# Normlization options: ['', 'obb_normalization']
+normalization: 'obb_normalization'
+
+# Evaluation
+metrics: 'percentual_correct_keypoints'
+threshold: 50
+
+# Checkpoint parameters
+checkpoint_dir: './checkpoints'
+
+# Logging root
+logs_dir: './logs'
+
+train_dataset: [
+    'D:/azure_kinect/1E2DB6/01/master_1/', 'D:/azure_kinect/1E2DB6/02/master_1/', 'D:/azure_kinect/1E2DB6/04/master_1/', 'D:/azure_kinect/1E2DB6/05/master_1/', 'D:/azure_kinect/1E2DB6/06/master_1/',
+    'D:/azure_kinect/4AD6F3/01/master_1/', 'D:/azure_kinect/4AD6F3/02/master_1/', 'D:/azure_kinect/4AD6F3/03/master_1/', 'D:/azure_kinect/4AD6F3/04/master_1/', 'D:/azure_kinect/4AD6F3/12/master_1/',
+    'D:/azure_kinect/4B8AF1/01/master_1/', 'D:/azure_kinect/4B8AF1/02/master_1/', 'D:/azure_kinect/4B8AF1/03/master_1/', 'D:/azure_kinect/4B8AF1/04/master_1/',
+    'D:/azure_kinect/5E373E/01/master_1/', 'D:/azure_kinect/5E373E/02/master_1/', 'D:/azure_kinect/5E373E/03/master_1/',
+    'D:/azure_kinect/20E29D/01/master_1/', 'D:/azure_kinect/20E29D/02/master_1',  'D:/azure_kinect/20E29D/03/master_1', 'D:/azure_kinect/20E29D/04/master_1',
+    'D:/azure_kinect/37A7AA/02/master_1/', 'D:/azure_kinect/37A7AA/03/master_1/', 'D:/azure_kinect/37A7AA/04/master_1/',
+    'D:/azure_kinect/339F94/01/master_1', 'D:/azure_kinect/339F94/02/master_1','D:/azure_kinect/339F94/03/master_1','D:/azure_kinect/339F94/04/master_1',
+    'D:/azure_kinect/471EF1/01/master_1','D:/azure_kinect/471EF1/02/master_1','D:/azure_kinect/471EF1/04/master_1',
+    'D:/azure_kinect/857F1E/01/master_1', 'D:/azure_kinect/857F1E/03/master_1', 'D:/azure_kinect/857F1E/04/master_1',
+    'D:/azure_kinect/927394/01/master_1','D:/azure_kinect/927394/02/master_1','D:/azure_kinect/927394/03/master_1',
+    'D:/azure_kinect/AEBA3A/01/master_1',
+    'D:/azure_kinect/AFCD31/03/master_1', # all others have bad registration so far
+    'D:/azure_kinect/F205FE/01/master_1', 'D:/azure_kinect/F205FE/02/master_1/', 
+]
+
+test_dataset: [
+    'D:/azure_kinect/76ABFD/03/master_1', 
+    'D:/azure_kinect/CCB8AD/01/master_1', 
+]
