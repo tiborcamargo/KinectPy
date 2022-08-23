@@ -39,25 +39,30 @@ class KinectDataset:
         self.flag = flag
         
         # Verify if flag corresponds to the directory structure being passed
+        pcd_dirs = []
+        self.pointcloud_files = []
         for master_root_dir in master_root_dirs:
+            # asserting if train/val/test is passed correctly
             if flag not in os.path.abspath(master_root_dir).split(os.path.sep):
                  raise Exception('Directory structure does not match the dataset flag')
-        
-        # Point cloud directories and its corresponding skeleton CSV files
-        pcd_dir_regex = os.path.abspath(os.path.join(master_root_dir, 'filtered_and_registered_pointclouds'))
-        pcd_dirs = glob.glob(pcd_dir_regex) 
+            # Point cloud directories and its corresponding skeleton CSV files
+            pcd_dir_regex = os.path.abspath(os.path.join(master_root_dir, 'filtered_and_registered_pointclouds'))
+            pcd_dirs.append(glob.glob(pcd_dir_regex))
+            self.pointcloud_files.append(glob.glob(os.path.join(pcd_dir_regex, '*.pcd')))
+
+        # transforming lists to numpy array and shuffling pcd filepaths
+        pcd_dirs = np.concatenate(pcd_dirs)
+        self.pointcloud_files = np.concatenate(self.pointcloud_files)
+        self.pointcloud_files = np.random.choice(self.pointcloud_files, 
+                                                 size=len(self.pointcloud_files), 
+                                                 replace=False)
+
         # Mapping filename to a skeleton CSV
         self.correspondent_skeleton_csv = {}
         for pcd_dir in pcd_dirs:
             skeleton_fp = pcd_dir.replace('filtered_and_registered_pointclouds', os.path.join('skeleton', 'synced_positions_3d.csv'))
             self.correspondent_skeleton_csv[pcd_dir] = pd.read_csv(skeleton_fp, index_col='timestamp')
 
-        self.pointcloud_files = glob.glob(os.path.join(pcd_dir_regex, '*.pcd'))
-        self.pointcloud_files = np.random.choice(self.pointcloud_files, 
-                                                 size=len(self.pointcloud_files), 
-                                                 replace=False)
-        
-        
         self.dataset_size = len(self.pointcloud_files)
         
         # Creating tensorflow dataset
