@@ -1,30 +1,11 @@
 import os
+import glob
 import open3d as o3d
 import pandas as pd
 import tensorflow as tf
 import numpy as np
-#from preprocessing.utils import select_points_randomly
-from typing import List, Tuple
+from typing import List, Tuple, Literal
 np.set_printoptions(suppress=True)
-
-
-def select_points_randomly(
-    pointcloud: o3d.geometry.PointCloud, 
-    number_of_points: int 
-    ) -> np.ndarray:
-    """
-    Because each point cloud contains a large amount of points, we need 
-    to sample a smaller subset of points to work with.
-    
-    Currently only uses spatial information, but no color information
-    """
-    pcd_points = np.asarray(pointcloud.points)
-    sampled_idx = np.random.choice(np.arange(0, len(pcd_points), 1), 
-                                   size=number_of_points, 
-                                   replace=False)
-    pcd_points = pcd_points[sampled_idx]
-    pcd_colors = None
-    return pcd_points
 
 
 class KinectDataset:
@@ -34,6 +15,7 @@ class KinectDataset:
         batch_size: int,
         joints: List[str],
         number_of_points: int,
+        flag: Literal['train', 'val', 'test']
         ):
         """
         Args:
@@ -42,6 +24,9 @@ class KinectDataset:
             joints: Skeleton joints defined by your RGB-D sensor, such as: ['PELVIS', 'FOOT', ...],
                     see all options in the 
             number_of_points: Number of points to be sub-sampled in a point cloud
+            flag: whether the dataset is used for training, validation or testing,
+                  it is used to enforce a directory structure such as 
+                  /path/to/train/... 
         """
         # Dataset size will be increased when calling tf.data.Dataset.from_generator
         self.dataset_size = 0
@@ -51,95 +36,94 @@ class KinectDataset:
         self.number_of_joints = len(joints)
         self.number_of_points = number_of_points
         self.output_shapes = ((None, self.number_of_points, 3), (None, self.number_of_joints*3))
+        self.flag = flag
         
-        for i in range(len(master_root_dirs)):
-            pcd_dir = os.path.join(master_root_dirs[i], 'filtered_and_registered_pointclouds')
-            filenames = os.listdir(pcd_dir)
-            self.dataset_size += len(filenames)
+        # Verify if flag corresponds to the directory structure being passed
+        for master_root_dir in master_root_dirs:
+            if flag not in os.path.abspath(master_root_dir).split(os.path.sep):
+                 raise Exception('Directory structure does not match the dataset flag')
+        
+        # Point cloud directories and its corresponding skeleton CSV files
+        pcd_dir_regex = os.path.abspath(os.path.join(master_root_dir, 'filtered_and_registered_pointclouds'))
+        pcd_dirs = glob.glob(pcd_dir_regex) 
+        # Mapping filename to a skeleton CSV
+        self.correspondent_skeleton_csv = {}
+        for pcd_dir in pcd_dirs:
+            skeleton_fp = pcd_dir.replace('filtered_and_registered_pointclouds', os.path.join('skeleton', 'synced_positions_3d.csv'))
+            self.correspondent_skeleton_csv[pcd_dir] = pd.read_csv(skeleton_fp, index_col='timestamp')
 
-            tf_dataset = tf.data.Dataset.from_generator(
-                    self._pointcloud_skeleton_tf_generator, 
-                    args= [master_root_dirs[i], self.batch_size, self.number_of_points, self.joints],
-                    output_types = self.output_types,
-                    output_shapes = self.output_shapes
-                    )
-
-            # Concatenate all folders in one unique generator
-            if i == 0:
-                dataset_left = tf_dataset
-            if i > 0:
-                dataset_right =  tf_dataset
-                dataset_left = dataset_left.concatenate(dataset_right)
-
-        self.dataset = dataset_left
-
-
+        self.pointcloud_files = glob.glob(os.path.join(pcd_dir_regex, '*.pcd'))
+        self.pointcloud_files = np.random.choice(self.pointcloud_files, 
+                                                 size=len(self.pointcloud_files), 
+                                                 replace=False)
+        
+        
+        self.dataset_size = len(self.pointcloud_files)
+        
+        # Creating tensorflow dataset
+        self.tf_dataset = tf.data.Dataset.from_generator(
+            self._pointcloud_skeleton_tf_generator, 
+            args= [self.pointcloud_files, self.batch_size, self.number_of_points, self.joints],
+            output_types = self.output_types,
+            output_shapes = self.output_shapes
+            )
+        
+        
     def _pointcloud_skeleton_tf_generator(
         self,
-        master_root_dir: str, 
+        pointcloud_files: List[str], 
         batch_size: int,
         number_of_points: int,
         joints: List[str]
         ):
         """
         Args:
-            master_root_dir: Directory with master pointclouds, skeleton and other data
+            pointcloud_files: Filepaths of all point clouds used
             batch_size: Size of batches when consuming the generator
             number_of_points: Downsampling a pointclod to use *number_of_points*
             number_of_joints: How many joints is used for the RGBD device
         """
-        pcd_dir =  tf.io.gfile.join(master_root_dir.decode('utf-8'), 'filtered_and_registered_pointclouds')
-        file_list =  tf.io.gfile.listdir(pcd_dir)
-
-        skeleton_fp =  tf.io.gfile.join(master_root_dir.decode('utf-8'), 'skeleton', 'synced_positions_3d.csv')
-        skeleton_df = pd.read_csv(open(skeleton_fp,'r'), index_col='timestamp')
-        joints_columns = self._select_joints(joints, skeleton_df)
-        skeleton_df = skeleton_df[joints_columns]
-        
-        np.random.shuffle(file_list)
-    
-        i = 0
+        pointcloud_files = [file.decode('utf-8') for file in pointcloud_files]
+        i = 0 
         while True:
-            if i*batch_size >= len(file_list):  
+            if i*batch_size >= len(pointcloud_files):  
                 i = 0
-                np.random.shuffle(file_list)
+                np.random.shuffle(pointcloud_files)
             else:
-
-                file_chunk = file_list[i*batch_size:(i+1)*batch_size] 
-                pointcloud_points = []
+                # probably it will need a decoder
+                file_chunk = pointcloud_files[i*batch_size:(i+1)*batch_size] 
                 skeleton_positions = []
-
+                pointcloud_points = []
                 for file in file_chunk:
+                    # Finding the proper skeleton dataframe and the proper timestamp 
+                    timestamp = int(file.split(os.path.sep)[-1][:-4])
+                    correspondent_skeleton_key = os.path.join(
+                        os.path.sep.join(file.split(os.path.sep)[:-2]), 
+                        'filtered_and_registered_pointclouds'
+                    )
 
-                    # Retrieving timestamps to get skeletons positions
-                    timestamp = int(file[:-4])
-                    skeleton_positions.append(skeleton_df.loc[timestamp].values)
+                    # Retrieving skeletons positions and joints
+                    skeleton_df = self.correspondent_skeleton_csv[correspondent_skeleton_key]
+                    joints_columns = self._select_joints(joints, skeleton_df)
+                    skeleton_positions.append(skeleton_df[joints_columns].loc[timestamp].values)
 
-                    # Reading point cloud and sampling
-                    pcd = o3d.io.read_point_cloud(os.path.join(pcd_dir, file))
-                    pcd_points = select_points_randomly(pcd, number_of_points)
+                    ## Reading point cloud and sampling
+                    pcd = o3d.io.read_point_cloud(file)
+                    pcd_points = self._select_points_randomly(pcd, number_of_points)
                     pointcloud_points.append(pcd_points)
-
-                # Reshaping points 
-                pointcloud_points = np.asarray(pointcloud_points)
-                pointcloud_points = pointcloud_points.reshape(-1, number_of_points, 3) 
-
-                skeleton_positions = np.asarray(skeleton_positions)
-                skeleton_positions = skeleton_positions.reshape(-1, len(joints_columns))
-
+                
+                # Reshaping to numpy array with (n_batches, m points, 3*k joints)
+                pointcloud_points = np.array(pointcloud_points)
+                skeleton_positions = np.array(skeleton_positions)
                 yield pointcloud_points, skeleton_positions
                 i = i + 1
-
-
-    def __call__(self):
-        return self.dataset
-    
-    
+                
+                
     def _select_joints(
         self, 
         joints_list: List[str], 
         skeleton_dataframe: pd.DataFrame
-        ) -> List[str]:
+        ):
         """ 
         Given a list of joints, select columns in the dataframe accordingly.
         This function is used because the name of the column might differ 
@@ -147,9 +131,6 @@ class KinectDataset:
             eg: joints_list = ['PELVIS']
             skelet_dataframe.columns
             >> ['PELVIS (x)', 'PELVIS (y)', 'PELVIS (z)']
-
-        Attention: The order always remains the same, independent 
-        of the joints_list ordering!
         """
         joint_cols = []
         for col in skeleton_dataframe.columns:
@@ -157,46 +138,38 @@ class KinectDataset:
                 if col.startswith(joint.decode('utf-8')):
                     joint_cols.append(col)
         return joint_cols
-
     
-    def split_train_val(
+    
+    def __call__(self):
+        return self.tf_dataset.take(self.dataset_size)
+    
+    
+    def _select_points_randomly(
         self,
-        train_split: int = 0.7,
-        val_split: int = 0.15,
-        ) -> List[tf.data.Dataset]:
+        pointcloud: o3d.geometry.PointCloud, 
+        number_of_points: int 
+        ) -> np.ndarray:
         """
-        Given a tensorflow dataset, return a split with train, test and validation datasets
-    
-        Args:
-            train_size: Percentual of dataset to be used as training
-            val_size: Percentual of dataset to be used as validation
-        
-        Returns:
-            (train_dataset, validation_dataset, test_dataset)
+        Because each point cloud contains a large amount of points, we need 
+        to sample a smaller subset of points to work with.
+
+        Currently only uses spatial information, but no color information
         """
-        assert abs(1 - (train_split + val_split )) < 1e-15, 'The percentual of training and validation should equal to 1' 
-        assert val_split != 0, 'If you do not want to use validation, pass self.dataset instead'
+        pcd_points = np.asarray(pointcloud.points)
+        sampled_idx = np.random.choice(np.arange(0, len(pcd_points), 1), 
+                                       size=number_of_points, 
+                                       replace=False)
+        pcd_points = pcd_points[sampled_idx]
+        pcd_colors = None
+        return pcd_points
     
-        train_size = int(train_split * self.dataset_size)
-        val_size = int(val_split * self.dataset_size)
-        
-        print('Train size:', train_size)
-        print('Val size:', val_size)
     
-        train_dataset = self.dataset.take(train_size)
-        remaining = self.dataset.skip(train_size)
-        val_dataset = remaining.take(val_size)
-
-        return train_dataset, val_dataset 
-
-
     def visualize_dataset(
         self, 
         number_of_batches: int = 2
         ):
         pcds = []
         skeleton = []
-
         for data in self.dataset.take(number_of_batches):
             points, skeletons = data
             for j in range(len(points)):
@@ -211,3 +184,4 @@ class KinectDataset:
         viewer.add_point_cloud_animation(pcds)
         viewer.add_skeleton(skeleton)
         viewer.show_window()
+    

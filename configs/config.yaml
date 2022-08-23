@@ -1,26 +1,26 @@
-# Experiment nomenclatures
-project: 'TestProject'
-name: 'FirstExperiment'
+project: 'Test'
+name: 'lower_joints_4096_points_vanilla_pointnet_no_normalization'
+
+joints: ['PELVIS', 'HIP_LEFT', 'HIP_RIGHT', 'KNEE_RIGHT', 'KNEE_LEFT', 'ANKLE_RIGHT', 'ANKLE_LEFT']
+sampling_points: 4096
+train_size: 0.95
+val_size: 0.05
 
 # Training parameters
-joints: ['PELVIS', 'HIP_LEFT', 'HIP_RIGHT']
-sampling_points: 1024
-train_size: 0.9
-val_size: 0.1
-epochs: 30
+epochs: 1
 batch_size: 16
 learning_rate: 0.0005
 loss: 'mean_squared_error'
 
+# Normlization options: ['', 'obb_normalization']
+normalization: ''
+
 # Evaluation
 metrics: 'percentual_correct_keypoints'
-threshold: 50
+threshold: 100
 
 # Checkpoint parameters
 checkpoint_dir: './checkpoints'
 
 # Logging root
 logs_dir: './logs'
-
-# Dataset
-datasets: ['D:/azure_kinect/AEBA3A/02', 'D:/azure_kinect/AEBA3A/03']
