@@ -85,7 +85,6 @@ class KinectDataset:
         pointcloud_files = [file.decode('utf-8') for file in pointcloud_files]
         i = 0 
         for file in pointcloud_files:
-            print(file, flush=True)
 
             # Finding the proper skeleton dataframe and the proper timestamp 
             timestamp = int(file.split(os.path.sep)[-1][:-4])
