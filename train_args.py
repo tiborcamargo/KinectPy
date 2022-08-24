@@ -1,4 +1,3 @@
-from cgi import test
 import os
 import glob
 import wandb
@@ -28,16 +27,16 @@ logging.basicConfig(
     force=True
 )
 
-MASTER_ROOT_DIRS = glob.glob('D:/azure_kinect/train/*/*/master_1/')[0:1]
+MASTER_ROOT_DIRS = glob.glob('D:/azure_kinect/train/*/*/master_1/')[0:2]
 TEST_ROOT_DIRS = glob.glob('D:/azure_kinect/test/*/*/master_1/')[0:1]
 VAL_ROOT_DIRS = glob.glob('D:/azure_kinect/val/*/*/master_1/')[0:1]
+
 
 if __name__ == '__main__':
 
     # Import dataset
     train_dataset = KinectDataset(
         master_root_dirs=MASTER_ROOT_DIRS, 
-        batch_size=configs['batch_size'],
         number_of_points=configs['sampling_points'],
         joints=configs['joints'],
         flag='train'
@@ -45,7 +44,6 @@ if __name__ == '__main__':
 
     val_dataset = KinectDataset(
         master_root_dirs=VAL_ROOT_DIRS, 
-        batch_size=configs['batch_size'],
         number_of_points=configs['sampling_points'],
         joints=configs['joints'],
         flag='val'
@@ -53,15 +51,14 @@ if __name__ == '__main__':
 
     test_dataset = KinectDataset(
         master_root_dirs=TEST_ROOT_DIRS, 
-        batch_size=configs['batch_size'],
         number_of_points=configs['sampling_points'],
         joints=configs['joints'],
         flag='test'
     )
 
-    train_ds = train_dataset()
-    val_ds = val_dataset()
-    test_ds = test_dataset()
+    train_ds = train_dataset().batch(configs['batch_size']).prefetch(5)
+    val_ds = val_dataset().batch(configs['batch_size']).prefetch(5)
+    test_ds = test_dataset().batch(configs['batch_size']).prefetch(5)
 
     if configs['normalization'] != '':
         train_ds = train_dataset.map(normalization_options[configs['normalization']])
