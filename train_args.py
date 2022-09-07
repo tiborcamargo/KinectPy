@@ -27,9 +27,10 @@ logging.basicConfig(
     force=True
 )
 
-MASTER_ROOT_DIRS = glob.glob('D:/azure_kinect/train/*/*/master_1/')[0:2]
-TEST_ROOT_DIRS = glob.glob('D:/azure_kinect/test/*/*/master_1/')[0:1]
-VAL_ROOT_DIRS = glob.glob('D:/azure_kinect/val/*/*/master_1/')[0:1]
+MASTER_ROOT_DIRS = glob.glob('D:/azure_kinect/train/*/*/master_1/')
+MASTER_ROOT_DIRS = [dir for dir in MASTER_ROOT_DIRS if dir.split(os.path.sep)[-3].find('_') < 0 ]
+TEST_ROOT_DIRS = glob.glob('D:/azure_kinect/test/*/*/master_1/')
+VAL_ROOT_DIRS = glob.glob('D:/azure_kinect/val/*/*/master_1/')
 
 
 if __name__ == '__main__':
@@ -55,14 +56,15 @@ if __name__ == '__main__':
         joints=configs['joints'],
         flag='test'
     )
-
+    
     train_ds = train_dataset().batch(configs['batch_size']).prefetch(5)
     val_ds = val_dataset().batch(configs['batch_size']).prefetch(5)
     test_ds = test_dataset().batch(configs['batch_size']).prefetch(5)
 
     if configs['normalization'] != '':
-        train_ds = train_dataset.map(normalization_options[configs['normalization']])
-        val_ds = val_dataset.map(normalization_options[configs['normalization']])
+        train_ds = train_ds.map(normalization_options[configs['normalization']])
+        val_ds = val_ds.map(normalization_options[configs['normalization']])
+        test_ds = test_ds.map(normalization_options[configs]['normalization'])
     
     # Create model and compile
     model = create_pointnet(configs['sampling_points'], len(configs['joints']))
