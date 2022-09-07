@@ -57,15 +57,15 @@ if __name__ == '__main__':
         flag='test'
     )
     
-    train_ds = train_dataset().batch(configs['batch_size']).prefetch(5)
-    val_ds = val_dataset().batch(configs['batch_size']).prefetch(5)
-    test_ds = test_dataset().batch(configs['batch_size']).prefetch(5)
+    train_ds = train_dataset().batch(configs['batch_size']).prefetch(1)
+    val_ds = val_dataset().batch(configs['batch_size']).prefetch(1)
+    test_ds = test_dataset().batch(configs['batch_size']).prefetch(1)
 
     if configs['normalization'] != '':
         train_ds = train_ds.map(normalization_options[configs['normalization']])
         val_ds = val_ds.map(normalization_options[configs['normalization']])
-        test_ds = test_ds.map(normalization_options[configs]['normalization'])
-    
+        test_ds = test_ds.map(normalization_options[configs['normalization']])    
+        
     # Create model and compile
     model = create_pointnet(configs['sampling_points'], len(configs['joints']))
 
