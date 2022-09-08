@@ -22,16 +22,16 @@ if __name__ == '__main__':
     # Read arguments
     configs = parse_args(print_config=True)
 
-    # Create model and compile
+    # Create model, compile and load
+    metrics = [percentual_correct_keypoints(t) for t in range(50, 210, 10)]
     model = create_pointnet(configs['sampling_points'], len(configs['joints']))
-
     checkpoint_dir = os.path.join(configs['checkpoint_dir'], configs['project'], configs['name'])
     logging.info(f'Loading from ckpt from {checkpoint_dir}')
     model.load_weights(checkpoint_dir)
     model.compile(
         loss=configs['loss'],
         optimizer=keras.optimizers.Adam(learning_rate=configs['learning_rate']),
-        metrics=percentual_correct_keypoints(configs['threshold'])
+        metrics=metrics
     )
 
     # Import dataset
@@ -46,20 +46,21 @@ if __name__ == '__main__':
 
     if configs['normalization'] != '':
         test_ds = test_ds.map(normalization_options[configs['normalization']])    
-        test_dataset_size = test_dataset.dataset_size
-        test_loss, test_metric = model.evaluate(test_ds, steps=test_dataset_size//configs['batch_size'])
-    else:
-        test_loss, test_metric = model.evaluate(test_ds, steps=test_dataset.dataset_size//configs['batch_size'])
+
+    evaluation = model.evaluate(test_ds, steps=test_dataset.dataset_size//configs['batch_size'])
+    test_loss = evaluation[0]
+    test_pck = evaluation[1:]
 
     # Save and print evaluation
-    result_message = f"PCK@{configs['threshold']}: Mean loss = {str(test_loss)}, Mean PCK = {str(test_metric)}" 
+    # Save and print evaluation
+    result_message = f'Mean loss = {str(test_loss)}\n'
+    for metric, pck in zip(metrics, test_pck):
+        result_message += f"PCK@{''.join(filter(str.isdigit, metric.__name__))}, Mean PCK = {str(pck)}" + '\n'
+
     evaluation_fp = os.path.join(
         checkpoint_dir,
         f"evaluation.txt"
         )
-
-    with open (evaluation_fp, 'a') as filedata:                            
-        filedata.write(result_message + '\n')
-        logging.info('Data saved at:', evaluation_fp)
-
+    
+    logging.info('Data saved at:', evaluation_fp)
     logging.info(result_message)
