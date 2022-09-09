@@ -24,7 +24,7 @@ if __name__ == '__main__':
     configs = parse_args(print_config=True)
 
     # Create model, compile and load
-    pck_start = 50
+    pck_start = 0
     pck_end = 200
     metrics = [percentual_correct_keypoints(t) for t in range(pck_start, pck_end + 10, 10)]
     model = create_pointnet(configs['sampling_points'], len(configs['joints']))
@@ -54,7 +54,6 @@ if __name__ == '__main__':
     test_loss = evaluation[0]
     test_pck = evaluation[1:]
 
-    # Save and print evaluation
     # Save and print evaluation
     result_message = f'Mean loss = {str(test_loss)}\n'
     for metric, pck in zip(metrics, test_pck):
