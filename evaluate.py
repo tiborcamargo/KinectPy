@@ -4,6 +4,7 @@ import logging
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
+import matplotlib.pyplot as plt
 from models.pointnet import create_pointnet
 from datasets.kinect_dataset import KinectDataset
 from metrics.metric import percentual_correct_keypoints
@@ -23,7 +24,9 @@ if __name__ == '__main__':
     configs = parse_args(print_config=True)
 
     # Create model, compile and load
-    metrics = [percentual_correct_keypoints(t) for t in range(50, 210, 10)]
+    pck_start = 50
+    pck_end = 200
+    metrics = [percentual_correct_keypoints(t) for t in range(pck_start, pck_end + 10, 10)]
     model = create_pointnet(configs['sampling_points'], len(configs['joints']))
     checkpoint_dir = os.path.join(configs['checkpoint_dir'], configs['project'], configs['name'])
     logging.info(f'Loading from ckpt from {checkpoint_dir}')
@@ -61,6 +64,17 @@ if __name__ == '__main__':
         checkpoint_dir,
         f"evaluation.txt"
         )
+
+    with open(evaluation_fp, 'w') as file:
+        file.write(result_message)
     
+    plt.plot([t for t in range(pck_start, pck_end + 10, 10)], evaluation[1:])
+    plt.title(configs['name'])
+    plt.xlabel('threshold (milimiters')
+    plt.ylabel('pck')
+    plt.grid()
+    plt.savefig(evaluation_fp.replace('.txt', '.png'))
+    plt.close()
+
     logging.info('Data saved at:', evaluation_fp)
     logging.info(result_message)
