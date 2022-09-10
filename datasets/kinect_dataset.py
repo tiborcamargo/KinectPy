@@ -56,7 +56,6 @@ class KinectDataset:
             skeleton_fp = pcd_dir.replace('filtered_and_registered_pointclouds', os.path.join('skeleton', 'synced_positions_3d.csv'))
             self.correspondent_skeleton_csv[pcd_dir] = pd.read_csv(skeleton_fp, index_col='timestamp')
 
-        random.shuffle(self.pointcloud_files)
         self.dataset_size = len(self.pointcloud_files)
 
         # Creating tensorflow dataset
@@ -80,7 +79,7 @@ class KinectDataset:
         """
         pointcloud_files = [file.decode('utf-8') for file in pointcloud_files]
         i = 0 
-        for file in list(pointcloud_files):
+        for file in pointcloud_files:
             # The try-exception is here for when pcds cant find a correspondence in csv
             try:
                 # Finding the proper skeleton dataframe and the proper timestamp 
