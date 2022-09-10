@@ -4,6 +4,7 @@ import open3d as o3d
 import pandas as pd
 import tensorflow as tf
 import numpy as np
+from options.joints import JOINTS_INDICES
 from typing import List, Literal
 import gc
 gc.disable()
@@ -37,7 +38,7 @@ class KinectDataset:
         self.number_of_points = number_of_points
         self.output_shapes = ((self.number_of_points, 3), (self.number_of_joints*3))
         self.flag = flag
-        self.joints_columns = np.concatenate([[joint + ' (x)', joint + ' (y)', joint + ' (z)']  for joint in joints])
+        self.joints_columns = np.concatenate([[JOINTS_INDICES[joint] + j for j in range(1,4)] for joint in joints])
 
         master_root_dirs = []
         for subject in subjects_dirs:
@@ -92,7 +93,7 @@ class KinectDataset:
 
                 # Retrieving skeletons positions and joints
                 skeleton_df = self.correspondent_skeleton_csv[correspondent_skeleton_key]
-                skeleton_positions = skeleton_df[self.joints_columns].loc[timestamp].values
+                skeleton_positions = skeleton_df.loc[timestamp].values[self.joints_columns]
 
                 ## Reading point cloud and sampling
                 pcd = o3d.io.read_point_cloud(file)
