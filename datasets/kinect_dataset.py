@@ -4,11 +4,8 @@ import open3d as o3d
 import pandas as pd
 import tensorflow as tf
 import numpy as np
-from options.joints import JOINTS_INDICES
-from typing import List, Literal
-import gc
-gc.disable()
-np.set_printoptions(suppress=True)
+from utils.processing import select_points_randomly
+from typing import List, Literal, Tuple
 
 
 class KinectDataset:
@@ -17,7 +14,8 @@ class KinectDataset:
         subjects_dirs, 
         joints: List[str],
         number_of_points: int,
-        flag: Literal['train', 'val', 'test']
+        flag: Literal['train', 'val', 'test'],
+        debug=False,
         ):
         """
         Args:
@@ -47,7 +45,6 @@ class KinectDataset:
                     master_dir = os.path.join(subject, experiment, 'master_1')
                     master_root_dirs.append(master_dir)
                     
-        random.shuffle(master_root_dirs)
         self.pointcloud_files = []
         self.correspondent_skeleton_csv = {}
 
@@ -59,7 +56,10 @@ class KinectDataset:
             self.correspondent_skeleton_csv[pcd_dir] = pd.read_csv(skeleton_fp, index_col='timestamp')
 
         self.dataset_size = len(self.pointcloud_files)
+        random.shuffle(self.pointcloud_files)
 
+        if debug:
+            self.pointcloud_files = self.pointcloud_files[:500]
         # Creating tensorflow dataset
         self.tf_dataset = tf.data.Dataset.from_generator(
             self._pointcloud_skeleton_tf_generator, 
@@ -80,8 +80,11 @@ class KinectDataset:
             number_of_points: Downsampling a pointclod to use *number_of_points*
         """
         pointcloud_files = [file.decode('utf-8') for file in pointcloud_files]
+        # pointclouds = self._load_to_memory(pointcloud_files)
+
         i = 0 
         for file in pointcloud_files:
+            # file, pcd = pointcloud
             # The try-exception is here for when pcds cant find a correspondence in csv
             try:
                 # Finding the proper skeleton dataframe and the proper timestamp 
@@ -96,11 +99,11 @@ class KinectDataset:
                 skeleton_df = self.correspondent_skeleton_csv[correspondent_skeleton_key]
                 skeleton_positions = skeleton_df.loc[timestamp][self.joints_columns].values
 
-                ## Reading point cloud and sampling
+                ## Reading point cloud and samplingig
                 pcd = o3d.io.read_point_cloud(file)
-                pcd_points = self._select_points_randomly(pcd, number_of_points)
+                pcd = select_points_randomly(pcd, self.number_of_points)
 
-                yield pcd_points, skeleton_positions
+                yield pcd, skeleton_positions
                 i = i + 1
 
             except Exception as e:
@@ -109,26 +112,18 @@ class KinectDataset:
                 
     def __call__(self):
         return self.tf_dataset#.take(self.dataset_size)
-    
-    
-    def _select_points_randomly(
-        self,
-        pointcloud: o3d.geometry.PointCloud, 
-        number_of_points: int 
-        ) -> np.ndarray:
-        """
-        Because each point cloud contains a large amount of points, we need 
-        to sample a smaller subset of points to work with.
+        
 
-        Currently only uses spatial information, but no color information
-        """
-        pcd_points = np.asarray(pointcloud.points)
-        sampled_idx = np.random.choice(np.arange(0, len(pcd_points), 1), 
-                                       size=number_of_points, 
-                                       replace=False)
-        pcd_points = pcd_points[sampled_idx]
-        pcd_colors = None
-        return pcd_points
+    # def _load_to_memory(self, pointcloud_files: List[str]) -> List[Tuple[str, np.ndarray]]:
+    #     print('Saving pointclouds to memory, this might take few minutes...', flush=True)
+    #     pointclouds = []
+    #     for i, pcd_file in enumerate(pointcloud_files):
+    #         pcd = o3d.io.read_point_cloud(pcd_file)
+    #         pcd = select_points_randomly(pcd, self.number_of_points)
+    #         pointclouds.append((pcd_file, pcd))
+    #         if (i+1)%500 == 0:
+    #             print(f'{i+1} pointclouds allocated', flush=True)
+    #     return pointclouds
     
     
     def visualize_dataset(
@@ -150,4 +145,19 @@ class KinectDataset:
         viewer.add_point_cloud_animation(pcds)
         viewer.add_skeleton(skeleton)
         viewer.show_window()
-      
+        
+
+if __name__ == '__main__':
+    import glob
+    # Import dataset
+    subject_dirs = glob.glob('D:/azure_kinect/train/*')
+    
+    train_dataset = KinectDataset(
+        subjects_dirs=subject_dirs, 
+        number_of_points=4096,
+        joints=['HIP_LEFT', 'HIP_RIGHT', 'PELVIS'],
+        flag='train'
+    )
+
+
+    train_ds = train_dataset().batch(16).prefetch(10)
