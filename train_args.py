@@ -8,7 +8,8 @@ from pathlib import Path
 from tensorflow import keras
 from evaluate import TEST_ROOT_DIRS
 from models.pointnet import create_pointnet
-from datasets.kinect_dataset import KinectDataset
+# from datasets.kinect_dataset import KinectDataset
+from datasets.kinect_dataset_npz import KinectDataset
 from metrics.metric import percentual_correct_keypoints
 from wandb.keras import WandbCallback
 from configs.argparser import parse_args 
@@ -27,9 +28,13 @@ logging.basicConfig(
     force=True
 )
 
-MASTER_ROOT_DIRS = glob.glob('E:/train/*')
-TEST_ROOT_DIRS = glob.glob('E:/test/*')
-VAL_ROOT_DIRS = glob.glob('E:/val/*')
+
+MASTER_ROOT_DIRS = glob.glob('E:/sampled_points_dataset/train/*')
+TEST_ROOT_DIRS = glob.glob('E:/sampled_points_dataset/test/*')
+VAL_ROOT_DIRS = glob.glob('E:/sampled_points_dataset/val/*')
+# MASTER_ROOT_DIRS = glob.glob('D:/azure_kinect/train/*')
+# TEST_ROOT_DIRS = glob.glob('D:/azure_kinect/test/*')
+# VAL_ROOT_DIRS = glob.glob('D:/azure_kinect/val/*')
 
 
 if __name__ == '__main__':
@@ -56,7 +61,7 @@ if __name__ == '__main__':
         flag='test'
     )
     
-    train_ds = train_dataset().batch(configs['batch_size']).cache().prefetch(10)
+    train_ds = train_dataset().batch(configs['batch_size']).cache().prefetch(1)
     val_ds = val_dataset().batch(configs['batch_size']).cache().prefetch(1)
     test_ds = test_dataset().batch(configs['batch_size']).cache().prefetch(1)
 
@@ -82,12 +87,16 @@ if __name__ == '__main__':
 
     ckpt_dir = os.path.join(configs['checkpoint_dir'], configs['project'], configs['name'])
 
-    cp_callback = tf.keras.callbacks.ModelCheckpoint(
+    cp_cb = tf.keras.callbacks.ModelCheckpoint(
         filepath=ckpt_dir, 
         verbose=1, 
         save_weights_only=False,
         save_freq='epoch'
         )
+
+    early_stopping_cb = tf.keras.callbacks.EarlyStopping(
+        monitor='val_loss',
+    )
 
     def scheduler(epoch, lr):
         if epoch < 10:
@@ -95,13 +104,14 @@ if __name__ == '__main__':
         else:
             return lr * tf.math.exp(-0.1)
 
-    lr_callback = tf.keras.callbacks.LearningRateScheduler(scheduler, verbose=0)
+    lr_cb = tf.keras.callbacks.LearningRateScheduler(scheduler, verbose=0)
 
     model.fit(
         train_ds,
         epochs=configs['epochs'], 
         validation_data=val_ds, 
-        callbacks=[cp_callback, lr_callback, WandbCallback()]
+        callbacks=[early_stopping_cb, cp_cb, lr_cb, WandbCallback()]
+
     )
 
     wandb.tensorflow.log(
