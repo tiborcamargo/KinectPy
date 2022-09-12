@@ -41,9 +41,7 @@ class KinectDataset:
         self.number_of_points = number_of_points
         self.output_shapes = ((self.number_of_points, 3), (self.number_of_joints*3))
         self.flag = flag
-        self.joints_indices = sorted(np.concatenate(
-            [[JOINTS_INDICES[joint] + j for j in range(0, 3)] for joint in joints]
-            ))
+        self.joints_columns = np.concatenate([[joint + ' (x)', joint + ' (y)', joint + ' (z)']  for joint in joints])
 
         master_root_dirs = []
         for subject in subjects_dirs:
@@ -56,14 +54,19 @@ class KinectDataset:
         self.correspondent_skeleton_csv = {}
 
         for master_root_dir in master_root_dirs:
+            # Save point cloud filenames
             pcd_dir = os.path.join(master_root_dir, 'filtered_and_registered_pointclouds')
             self.pointcloud_files.extend([os.path.join(pcd_dir, fn) for fn in os.listdir(pcd_dir)])
+            # Read joints CSV
+            skeleton_fp = pcd_dir.replace('filtered_and_registered_pointclouds', os.path.join('skeleton', 'synced_positions_3d.csv'))
+            self.correspondent_skeleton_csv[pcd_dir] = pd.read_csv(skeleton_fp, index_col='timestamp')
 
         self.dataset_size = len(self.pointcloud_files)
         random.shuffle(self.pointcloud_files)
 
         if debug:
-            self.pointcloud_files = self.pointcloud_files[:500]
+            self.pointcloud_files = self.pointcloud_files[:200]
+
         # Creating tensorflow dataset
         self.tf_dataset = tf.data.Dataset.from_generator(
             self._pointcloud_skeleton_tf_generator, 
@@ -91,11 +94,20 @@ class KinectDataset:
             # The try-exception is here for when pcds cant find a correspondence in csv
             try:
                 ## Reading point cloud and samplingig
+
                 npz_file = np.load(file)
                 pcd = npz_file['points'][:self.number_of_points]
-                joints = npz_file['joints'][self.joints_indices]
+                
+                correspondent_skeleton_key = tf.io.gfile.join(
+                    os.path.sep.join(file.split(os.path.sep)[:-2]), 
+                    'filtered_and_registered_pointclouds'
+                )
 
-                yield pcd, joints
+                timestamp = int(file.split(os.path.sep)[-1][:-4])
+                skeleton_df = self.correspondent_skeleton_csv[correspondent_skeleton_key]
+                skeleton_positions = skeleton_df.loc[timestamp][self.joints_columns].values
+
+                yield pcd, skeleton_positions 
                 i = i + 1
 
             except Exception as e:
