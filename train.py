@@ -12,7 +12,7 @@ from models.pointnet import create_pointnet
 from datasets.kinect_dataset_npz import KinectDataset
 from metrics.metric import percentual_correct_keypoints
 from options.normalization import normalization_options
-from configs.yacs_config import get_default_config
+from configs.config import get_default_config
 
 np.set_printoptions(suppress=True)
 tf.random.set_seed(1234)
@@ -85,7 +85,7 @@ if __name__ == '__main__':
     )
 
     train_ds = train_dataset().batch(BATCH_SIZE).cache().prefetch(tf.data.AUTOTUNE)
-    val_ds = val_dataset().repeat().batch(BATCH_SIZE, drop_remainder=True).cache().prefetch(tf.data.AUTOTUNE)
+    val_ds = val_dataset().batch(BATCH_SIZE, drop_remainder=True).cache().prefetch(tf.data.AUTOTUNE)
     test_ds = test_dataset().batch(BATCH_SIZE).cache().prefetch(tf.data.AUTOTUNE)
 
     if CONFIGS.DATA.NORMALIZATION != '':
@@ -134,12 +134,17 @@ if __name__ == '__main__':
 
     lr_cb = tf.keras.callbacks.LearningRateScheduler(scheduler, verbose=0)
 
+    print(val_dataset.dataset_size//BATCH_SIZE*EPOCHS)
     model.fit(
          train_ds,
          epochs=EPOCHS, 
-         validation_data=val_ds, 
+         validation_data=val_ds.repeat(), 
+         validation_batch_size=BATCH_SIZE,
          validation_steps=val_dataset.dataset_size//BATCH_SIZE*EPOCHS,
-         callbacks=[early_stopping_cb, lr_cb],
+         callbacks=[
+            early_stopping_cb,
+            lr_cb, 
+            ],
      )
 
     wandb.tensorflow.log(
