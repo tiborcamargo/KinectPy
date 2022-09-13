@@ -2,7 +2,7 @@
 Dataset class to use when pointclouds are saved as .npz files,
 with files containing ['points', 'joints'] as headers
 '''
-import os
+import os, sys
 import random
 import open3d as o3d
 import pandas as pd
@@ -90,11 +90,9 @@ class KinectDataset:
 
         i = 0 
         for file in pointcloud_files:
-            
             # The try-exception is here for when pcds cant find a correspondence in csv
             try:
                 ## Reading point cloud and samplingig
-
                 npz_file = np.load(file)
                 pcd = npz_file['points'][:self.number_of_points]
                 
@@ -106,16 +104,18 @@ class KinectDataset:
                 timestamp = int(file.split(os.path.sep)[-1][:-4])
                 skeleton_df = self.correspondent_skeleton_csv[correspondent_skeleton_key]
                 skeleton_positions = skeleton_df.loc[timestamp][self.joints_columns].values
-
+                
                 yield pcd, skeleton_positions 
                 i = i + 1
-
             except Exception as e:
-                print(e, flush=True)
+                exc_type, exc_obj, exc_tb = sys.exc_info()
+                fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+                print(file, flush=True)
+                print(exc_type, fname, exc_tb.tb_lineno, flush=True)
                 
                 
     def __call__(self):
-        return self.tf_dataset#.take(self.dataset_size)
+        return self.tf_dataset
         
     
     def visualize_dataset(
