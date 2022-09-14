@@ -33,8 +33,8 @@ def execute_global_registration(
     pcd_master: o3d.geometry.PointCloud, 
     pcd_sub: o3d.geometry.PointCloud,
     voxel_size: int = 35,
-    ransac_n_trials: int = 10
-    ) -> None:
+    ransac_n_trials: int = 15
+    ) -> np.ndarray:
     """
     Apply a global registration between pcd_master and pcd_sub, 
     where the result is a 4x4 transformation matrix that transforms
@@ -84,6 +84,7 @@ def execute_point_to_plane_registration(
     )
         
     return reg_p2l.transformation
+
 
 def execute_colored_ICP_registration(pcd_master, pcd_sub, initial_transformation):
     logging.info('Starting local registration refinement')

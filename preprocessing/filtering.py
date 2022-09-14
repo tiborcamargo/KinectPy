@@ -9,6 +9,22 @@ import tensorflow as tf
 from PIL import Image
 
 
+def filter_outliers(
+    pcd: o3d.geometry.PointCloud,
+    nb_neighbors: int = 200, 
+    std_ratio: float = 3.0,
+    voxel_size: float = 0.02
+    ) -> o3d.geometry.PointCloud:
+    """ 
+    Applies a statistical outlier removal for the Point Cloud `pcd`.
+    This method is specially useful to be applied before using any 
+    procedure that involves Oriented Bounding Boxes
+    """
+    voxel_down_pcd = copy.deepcopy(pcd).voxel_down_sample(voxel_size)
+    cloud, _  = voxel_down_pcd.remove_statistical_outlier(nb_neighbors, std_ratio)
+    return cloud
+
+
 class Filtering:
     def __init__(self, frozen_graph_fp, pbtxt_fp):
         self.net = self._load_segmentation_model(frozen_graph_fp, pbtxt_fp)

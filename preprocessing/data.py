@@ -1,12 +1,12 @@
 import os
-import cv2
 import copy
 import logging
 import numpy as np
 import pandas as pd
 import open3d as o3d
 from typing import List
-from preprocessing.filtering import Filtering
+from preprocessing.filtering import Filtering, filter_outliers
+from utils.io import load_color, load_depth, rgbd_to_pointcloud
 from utils.processing import sort_filenames_by_timestamp
 from preprocessing.registration import execute_global_registration, execute_point_to_plane_registration
 
@@ -58,7 +58,7 @@ class DataProcessor:
             registered_pcd.colors = registered_pcd_colors
 
             # Remove outliers from registered pcd
-            registered_pcd = self._filter_outliers(registered_pcd)
+            registered_pcd = filter_outliers(registered_pcd)
 
             # Save to disk
             registered_and_filtered_pcd_fp = os.path.join(
@@ -68,22 +68,6 @@ class DataProcessor:
                 )
             o3d.io.write_point_cloud(registered_and_filtered_pcd_fp + '.pcd', registered_pcd)
 
-
-    def _filter_outliers(
-        self, 
-        pcd: o3d.geometry.PointCloud,
-        nb_neighbors: int = 200, 
-        std_ratio: float = 3.0,
-        voxel_size: float = 0.02
-        ) -> o3d.geometry.PointCloud:
-        """ 
-        Applies a statistical outlier removal for the Point Cloud `pcd`.
-        This method is specially useful to be applied before using any 
-        procedure that involves Oriented Bounding Boxes
-        """
-        voxel_down_pcd = copy.deepcopy(pcd).voxel_down_sample(voxel_size)
-        cloud, _  = voxel_down_pcd.remove_statistical_outlier(nb_neighbors, std_ratio)
-        return cloud
 
 
     def _create_device_filenames_df(self, output_dirs):
@@ -115,8 +99,8 @@ class DataProcessor:
         # For each timestamp, filter image, save to pointcloud and then save
         master_color_fp = os.path.join(master_root_dir, 'color', self.device_filenames_df.iloc[file_idx][0])
         master_depth_fp = os.path.join(master_root_dir, 'depths', self.device_filenames_df.iloc[file_idx][0])
-        master_color = self._load_color(master_color_fp)
-        master_depth = self._load_depth(master_depth_fp)
+        master_color = load_color(master_color_fp)
+        master_depth = load_depth(master_depth_fp)
 
         # Apply filtering
         master_filtered_img = self.segmentation.apply_segmentation(master_color)
@@ -129,8 +113,8 @@ class DataProcessor:
             sub_root_dir = self.device_filenames_df.columns[device_idx]
             sub_color_fp = os.path.join(sub_root_dir, 'color', self.device_filenames_df.iloc[file_idx][device_idx])
             sub_depth_fp = os.path.join(sub_root_dir, 'depths', self.device_filenames_df.iloc[file_idx][device_idx])
-            sub_color = self._load_color(sub_color_fp)
-            sub_depth = self._load_depth(sub_depth_fp)                                                                            
+            sub_color = load_color(sub_color_fp)
+            sub_depth = load_depth(sub_depth_fp)                                                                            
 
             # Apply filtering
             sub_filtered_img = self.segmentation.apply_segmentation(sub_color)
@@ -153,9 +137,9 @@ class DataProcessor:
         master_color_fp = os.path.join(master_root_dir, 'color', self.device_filenames_df.iloc[file_idx][0])
         master_depth_fp = os.path.join(master_root_dir, 'depths', self.device_filenames_df.iloc[file_idx][0])
 
-        master_color = self._load_color(master_color_fp)
-        master_depth = self._load_depth(master_depth_fp)
-        master_pcd = self._rgbd_to_pointcloud(master_color, master_depth)
+        master_color = load_color(master_color_fp)
+        master_depth = load_depth(master_depth_fp)
+        master_pcd = rgbd_to_pointcloud(master_color, master_depth)
         
         for device_idx in range(1, self.number_of_devices):
             
@@ -164,9 +148,9 @@ class DataProcessor:
             sub_color_fp = os.path.join(sub_root_dir, 'color', self.device_filenames_df.iloc[file_idx][device_idx])
             sub_depth_fp = os.path.join(sub_root_dir, 'depths', self.device_filenames_df.iloc[file_idx][device_idx])
             
-            sub_color = self._load_color(sub_color_fp)
-            sub_depth = self._load_depth(sub_depth_fp)                                                                            
-            sub_pcd = self._rgbd_to_pointcloud(sub_color, sub_depth)
+            sub_color = load_color(sub_color_fp)
+            sub_depth = load_depth(sub_depth_fp)                                                                            
+            sub_pcd = rgbd_to_pointcloud(sub_color, sub_depth)
                
             # Apply registration and save the transformation matrix
             initial_transformation = execute_global_registration(master_pcd, sub_pcd)
@@ -190,45 +174,6 @@ class DataProcessor:
         reshaped_color = reshaped_color[(valid_pixels) & (valid_depths)]
         depth_img = depth_img[(valid_pixels) & (valid_depths)]
         
-        pcd = self._rgbd_to_pointcloud(reshaped_color, depth_img)
+        pcd = rgbd_to_pointcloud(reshaped_color, depth_img)
         return pcd
         
-        
-    def _load_color(self, color_fp):
-        color_suffix = '_rgb.png'
-        if not color_fp.endswith(color_suffix):
-            color_fp += color_suffix
-        color = cv2.imread(color_fp)
-        color = cv2.cvtColor(color, cv2.COLOR_BGR2RGB)
-        return color
-    
-    
-    def _load_depth(self, depth_fp):
-        depth_suffix = '_depth.dat'
-        if not depth_fp.endswith(depth_suffix):
-            depth_fp += depth_suffix
-        depth = np.fromfile(depth_fp, dtype=np.int16).reshape(-1, 3)
-        return depth
-    
-    
-    def _rgbd_to_pointcloud(self, color_img, depth_img):
-        """
-        Transforms RGB+D to point cloud, also removing color values
-        of rgb = [0, 0, 0], since many of them are invalid
-        """
-        pcd = o3d.geometry.PointCloud()
-        pcd.points = o3d.utility.Vector3dVector(depth_img.astype(np.float64))
-        pcd.colors = o3d.utility.Vector3dVector(color_img.astype(np.float64).reshape(-1, 3) / 255)
-        
-        # removing black color
-        points = np.asarray(pcd.points)
-        colors = np.asarray(pcd.colors)
-
-        non_black_idx = (points[:, 0] != 0) & (points[:, 1] != 0) & (points[:, 2] != 0)
-        valid_points = points[non_black_idx].astype(np.float64)
-        valid_colors = colors[non_black_idx].astype(np.float64)
-
-        pcd.points = o3d.utility.Vector3dVector(valid_points)
-        pcd.colors = o3d.utility.Vector3dVector(valid_colors)
-        
-        return pcd
