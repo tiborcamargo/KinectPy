@@ -18,14 +18,17 @@ np.set_printoptions(suppress=True)
 tf.random.set_seed(1234)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 
+
 # Give path to the yaml configuration file using argument parser
 parser = argparse.ArgumentParser(description=__doc__, add_help=True)
 parser.add_argument('--config', help='configuration file *.yaml', required=True)
+
 
 # Path to subjects
 MASTER_ROOT_DIRS = glob.glob('E:/sampled_points_dataset/train/*')
 TEST_ROOT_DIRS = glob.glob('E:/sampled_points_dataset/test/*')
 VAL_ROOT_DIRS = glob.glob('E:/sampled_points_dataset/val/*')
+
 
 # Loading configuration and defining constants
 CONFIGS = get_default_config(parser)
@@ -43,6 +46,7 @@ NAME = CONFIGS.PROJECT.EXPERIMENT
 CKPT_DIR = CONFIGS.DIRS.CHECKPOINT_DIR
 LOGS_DIR = CONFIGS.DIRS.LOGS_DIR
 
+
 # Logging options
 Path(LOGS_DIR).mkdir(parents=True, exist_ok=True)
 logging.basicConfig(
@@ -53,9 +57,9 @@ logging.basicConfig(
 )
 
 
-MASTER_ROOT_DIRS = glob.glob('E:/sampled_points_dataset/train/*')[:1]
+MASTER_ROOT_DIRS = glob.glob('E:/sampled_points_dataset/train/*')
 TEST_ROOT_DIRS = glob.glob('E:/sampled_points_dataset/test/*')
-VAL_ROOT_DIRS = glob.glob('E:/sampled_points_dataset/val/*')[:1]
+VAL_ROOT_DIRS = glob.glob('E:/sampled_points_dataset/val/*')
 
 
 if __name__ == '__main__':
@@ -88,13 +92,13 @@ if __name__ == '__main__':
     val_ds = val_dataset().batch(BATCH_SIZE, drop_remainder=True).cache().prefetch(tf.data.AUTOTUNE)
     test_ds = test_dataset().batch(BATCH_SIZE).cache().prefetch(tf.data.AUTOTUNE)
 
-    if CONFIGS.DATA.NORMALIZATION != '':
+    if NORMALIZATION != '':
         train_ds = train_ds.map(normalization_options[NORMALIZATION])
         val_ds = val_ds.map(normalization_options[NORMALIZATION])
         test_ds = test_ds.map(normalization_options[NORMALIZATION])   
         
     # Create model and compile
-    model = create_pointnet(CONFIGS.DATA.SAMPLING_POINTS, len(CONFIGS.DATA.JOINTS))
+    model = create_pointnet(NUMBER_OF_POINTS, len(JOINTS))
     
     if type(THRESHOLDS) == int or len(THRESHOLDS) == 1:
         metrics = percentual_correct_keypoints(THRESHOLDS)
@@ -113,18 +117,6 @@ if __name__ == '__main__':
     wandb.config['train_dir'] = MASTER_ROOT_DIRS 
     wandb.config['val_dir'] = VAL_ROOT_DIRS 
 
-    ckpt_dir = os.path.join(CKPT_DIR, PROJECT, NAME)
-
-    cp_cb = tf.keras.callbacks.ModelCheckpoint(
-        filepath=ckpt_dir, 
-        verbose=1, 
-        save_weights_only=False,
-        save_freq='epoch'
-        )
-
-    early_stopping_cb = tf.keras.callbacks.EarlyStopping(
-        monitor='val_loss',
-    )
 
     def scheduler(epoch, lr):
         if epoch < 10:
@@ -132,30 +124,43 @@ if __name__ == '__main__':
         else:
             return lr * tf.math.exp(-0.1)
 
+    early_stopping_cb = tf.keras.callbacks.EarlyStopping(
+        monitor='val_loss',
+        patience=4,
+        mode='auto'
+    )
+    
+    ckpt_dir = os.path.join(CKPT_DIR, PROJECT, NAME)
+
+    cp_cb = tf.keras.callbacks.ModelCheckpoint(
+        filepath=ckpt_dir, 
+        verbose=1, 
+        save_weights_only=False,
+        monitor='val_loss', 
+        save_best_only=True,
+        mode='auto'
+        )
+
     lr_cb = tf.keras.callbacks.LearningRateScheduler(scheduler, verbose=0)
 
-    print(val_dataset.dataset_size//BATCH_SIZE*EPOCHS)
     model.fit(
          train_ds,
          epochs=EPOCHS, 
-         validation_data=val_ds.repeat(), 
-         validation_batch_size=BATCH_SIZE,
-         validation_steps=val_dataset.dataset_size//BATCH_SIZE*EPOCHS,
+         validation_data=val_ds, 
          callbacks=[
+            cp_cb,
             early_stopping_cb,
             lr_cb, 
             ],
      )
 
+    logs_dir = os.path.join(LOGS_DIR, PROJECT, NAME)
+
     wandb.tensorflow.log(
-        tf.summary.create_file_writer(os.path.join(LOGS_DIR, 'tf_experiments'))
+        tf.summary.create_file_writer(os.path.join(logs_dir, 'tf_experiments'))
     )
 
     test_loss, test_metric = model.evaluate(test_ds, steps=test_dataset.dataset_size)
 
     logging.info("Mean loss, Mean PCK:" + str(test_loss) + ', ' + str(test_metric))
     print("Mean loss, Mean PCK:" + str(test_loss) + ', ' + str(test_metric))
-
-    wandb.config['test loss'] = test_loss
-    wandb.config['test metric'] = test_metric
-    wandb.log(CONFIGS)
