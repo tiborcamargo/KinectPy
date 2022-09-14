@@ -13,6 +13,7 @@ from datasets.kinect_dataset_npz import KinectDataset
 from metrics.metric import percentual_correct_keypoints
 from options.normalization import normalization_options
 from configs.config import get_default_config
+from wandb.keras import WandbCallback
 
 np.set_printoptions(suppress=True)
 tf.random.set_seed(1234)
@@ -100,7 +101,7 @@ if __name__ == '__main__':
     # Create model and compile
     model = create_pointnet(NUMBER_OF_POINTS, len(JOINTS))
     
-    if type(THRESHOLDS) == int or len(THRESHOLDS) == 1:
+    if type(THRESHOLDS) == float or type(THRESHOLDS) == int or len(THRESHOLDS) == 1:
         metrics = percentual_correct_keypoints(THRESHOLDS)
     else:
         metrics = [percentual_correct_keypoints(t) for t in range(THRESHOLDS[0], THRESHOLDS[1])]
@@ -119,14 +120,14 @@ if __name__ == '__main__':
 
 
     def scheduler(epoch, lr):
-        if epoch < 10:
+        if epoch < 5:
             return lr
         else:
             return lr * tf.math.exp(-0.1)
 
     early_stopping_cb = tf.keras.callbacks.EarlyStopping(
         monitor='val_loss',
-        patience=4,
+        patience=5,
         mode='auto'
     )
     
@@ -151,14 +152,15 @@ if __name__ == '__main__':
             cp_cb,
             early_stopping_cb,
             lr_cb, 
+            WandbCallback()
             ],
      )
 
     logs_dir = os.path.join(LOGS_DIR, PROJECT, NAME)
 
-    wandb.tensorflow.log(
-        tf.summary.create_file_writer(os.path.join(logs_dir, 'tf_experiments'))
-    )
+    # wandb.tensorflow.log(
+    #     tf.summary.create_file_writer(os.path.join(logs_dir, 'tf_experiments'))
+    # )
 
     test_loss, test_metric = model.evaluate(test_ds, steps=test_dataset.dataset_size)
 

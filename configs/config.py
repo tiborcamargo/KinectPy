@@ -7,7 +7,7 @@ _C = CN()
 # Project information
 _C.PROJECT = CN()
 _C.PROJECT.NAME = 'sampling_points_experiments'
-_C.PROJECT.EXPERIMENT = 'yacs'
+_C.PROJECT.EXPERIMENT = 'default'
 
 # Saving locations
 _C.DIRS = CN()
@@ -30,18 +30,20 @@ _C.TRAIN.LOSS = 'mean_squared_error'
 # Evaluation parameters
 _C.EVAL = CN()
 _C.EVAL.METRICS = 'percentual_correct_keypoints'
-_C.EVAL.THRESHOLDS = 50
+_C.EVAL.THRESHOLDS = 50.
 
 
-def get_default_config(parser):
+def get_default_config(parser=None):
   """Get a yacs CfgNode object with default values for my_project."""
   # Return a clone so that the defaults will not be altered
   # This is for the "local variable" use pattern
-  args = parser.parse_args()
+  if parser:
+    args = parser.parse_args()
 
-  if args.config:
-      _C.merge_from_file(args.config)
-  _C.freeze()
+    if args.config:
+        _C.merge_from_file(args.config)
+    _C.freeze()
+    
   return _C.clone()
 
 
