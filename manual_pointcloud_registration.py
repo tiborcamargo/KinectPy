@@ -73,12 +73,11 @@ def manual_registration(
     # estimate rough transformation using correspondences
     print("Compute a rough transform using the correspondences given by user")
     p2p = o3d.pipelines.registration.TransformationEstimationPointToPoint()
-    trans_init = p2p.compute_transformation(source, target,
-                                            o3d.utility.Vector2iVector(corr))
+    trans_init = p2p.compute_transformation(source, target, o3d.utility.Vector2iVector(corr))
 
     # point-to-point ICP for refinement
     print("Perform point-to-point ICP refinement")
-    threshold = 0.03  # 3cm distance threshold
+    threshold = 0.03  # 2cm distance threshold
     reg_p2p = o3d.pipelines.registration.registration_icp(
         source, target, threshold, trans_init,
         o3d.pipelines.registration.TransformationEstimationPointToPoint())
@@ -106,7 +105,7 @@ if __name__ == "__main__":
         if os.path.isdir(path):
             pcd = load_pointcloud(path, args['frame'], True)
             transformation_dst = os.path.join(
-                path.replace(f'sub_{i+1}', 'master'), f'transformation_master_sub_{i+1}.npy'
+                path.replace(f'sub_{i}', 'master_1'), f'transformation_master_sub_{i}.npy'
                 )
         elif os.path.isfile(path):
             pcd = load_pointcloud(path, args['frame'], False)
@@ -117,8 +116,10 @@ if __name__ == "__main__":
             raise ValueError('Please provide the path for a root directory or to a .pcd file')
         
         # Saving transformation destination and point clouds
-        transformation_dsts.append(transformation_dst)
+        if i > 0:
+            transformation_dsts.append(transformation_dst)
         pcds.append(pcd)
+
 
     # Apply manual registration and save result
     for i in range(1, len(pcds)):
