@@ -1,30 +1,45 @@
+'''
+This script was generated to manually register two or more point clouds
+
+User provides a  list of N paths, with the first being the master_1, such as:
+    python manual_pointcloud_registration.py /path/to/master_1 path/to/sub_1 path/to/sub_2 
+
+And the script yields N-1 transformations from the sub coordinate frames to the master reference frame
+    |_ (saved) /path/to/master_1/transformation_master_sub_1.npy 
+    |_ (saved) /path/to/master_1/transformation_master_sub_2.npy
+    
+'''
 import os
 import copy
 import copy
 import argparse
 import numpy as np
 import open3d as o3d
+import pandas as pd
 
 from utils.io import rgbd_to_pointcloud, load_color, load_depth
 from utils.processing import synchronize_filenames
 from typing import List, Union, Tuple
 
 
-def load_pointcloud(
-    path_dir: str, 
+def load_pointclouds(
+    synced_files: Union[pd.DataFrame, str], 
+    root_dirs: List[str],
     frame: int = 1, 
     isdir: bool = True
     ) -> o3d.geometry.PointCloud:
     if isdir:
-        print('Loading from:', path_dir)
-        synced_files = synchronize_filenames(path_dir).dropna()
-        timestamp = str(int(synced_files.iloc[frame]))
-        color = load_color(os.path.join(path_dir, 'color', timestamp + '_rgb.png'))
-        depth = load_depth(os.path.join(path_dir, 'depths', timestamp + '_depth.dat'))
-        pcd = rgbd_to_pointcloud(color, depth)
+        pcds = []
+        for i, device in enumerate(synced_files.columns):
+            # generate point cloud
+            timestamp = str(int(synced_files[device].iloc[frame]))
+            color = load_color(os.path.join(root_dirs[i], 'color', timestamp + '_rgb.png'))
+            depth = load_depth(os.path.join(root_dirs[i], 'depths', timestamp + '_depth.dat'))
+            pcds.append(rgbd_to_pointcloud(color, depth))
     else:
-        pcd = o3d.io.read_point_cloud(path_dir)
-    return pcd
+        for i in range(len(synced_files)):
+            pcds.append(o3d.io.read_point_cloud(synced_files[i]))
+    return pcds
 
 
 def draw_registration_result_original_color(
@@ -95,20 +110,28 @@ if __name__ == "__main__":
     parser.add_argument('-f', '--frame', type=int, help='Specific frame to use as calibration', required=False, default=1)
     args = vars(parser.parse_args())
 
+    directory_flag = True
+    
     if len(args['paths']) < 2:
         raise ValueError('At least two folders must be provided')
 
-    # Loading point clouds and setting their destination path
+    for path in args['paths']:
+        if os.path.isdir(path) == False:
+            directory_flag = False
+            
+    if directory_flag == True:
+        synced_files = synchronize_filenames(args['paths']).dropna()
+        
+    pcds = load_pointclouds(synced_files, args['paths'], args['frame'], directory_flag)
+  
+    # Setting destination path to save .npy transformation
     transformation_dsts = []
-    pcds = []
     for i, path in enumerate(args['paths']):
         if os.path.isdir(path):
-            pcd = load_pointcloud(path, args['frame'], True)
             transformation_dst = os.path.join(
                 path.replace(f'sub_{i}', 'master_1'), f'transformation_master_sub_{i}.npy'
                 )
         elif os.path.isfile(path):
-            pcd = load_pointcloud(path, args['frame'], False)
             transformation_dst = os.path.join(
                 path, f'transformation_master_sub_{i+1}.npy'
                 )
@@ -118,8 +141,6 @@ if __name__ == "__main__":
         # Saving transformation destination and point clouds
         if i > 0:
             transformation_dsts.append(transformation_dst)
-        pcds.append(pcd)
-
 
     # Apply manual registration and save result
     for i in range(1, len(pcds)):
