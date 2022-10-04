@@ -6,6 +6,8 @@ import pandas as pd
 import open3d as o3d
 from typing import List, Tuple, Union
 
+from zmq import device
+
     
 def sort_filenames_by_timestamp(
     list_of_files: str
@@ -56,7 +58,9 @@ def synchronize_filenames(
     Given a collection of directories with the extracted pointclouds from MKV files,
     returns a DataFrame where the filenames (or timestamps) are aligned side-by-side.
     """
-    
+    if type(output_dirs) != type([]):
+        output_dirs = [output_dirs]
+
     color_suffix = '_rgb.png'
     depth_suffix = '_depth.dat'
     
@@ -66,7 +70,7 @@ def synchronize_filenames(
     for device_dir in output_dirs:
         # transform /path/to/master_1 (sub_1) in absolute path
         device_dir = os.path.abspath(device_dir)
-
+        
         # extract which device
         device_name = os.path.basename(device_dir)
 
@@ -217,8 +221,9 @@ def labels_from_csv(
 
 def sync_skeleton_and_pointcloud(
     root_dirs: Union[str, List[str]], 
+    get_confidence_intervals: bool = False,
     save_csv: bool=False
-    ) -> pd.DataFrame:
+    ) -> Union[pd.DataFrame, List[pd.DataFrame]]:
     """
     Given a root dir, such as '/path/to/master_1', aligns timestamps for
     the skeleton estimation file to the point clouds  
@@ -236,8 +241,14 @@ def sync_skeleton_and_pointcloud(
 
         skeleton_fp = os.path.join(root_dir, 'skeleton', 'positions_3d.csv')
         skeleton_df = pd.read_csv(skeleton_fp, sep=';')
+
+        if get_confidence_intervals:
+            confidence_interval_df = skeleton_df[[col for col in skeleton_df.columns \
+                if col.endswith('(c)') and col != 'body_idx']]
+
         skeleton_df = skeleton_df[[col for col in skeleton_df.columns \
                                    if not col.endswith('(c)') and col != 'body_idx']]
+
 
         synced_pcd_skeleton = pd.merge_asof(timestamps_df, skeleton_df, on='timestamp')
         synced_pcd_skeleton = synced_pcd_skeleton.dropna()
@@ -247,7 +258,10 @@ def sync_skeleton_and_pointcloud(
             saved_fp = os.path.join(root_dir, 'skeleton', 'synced_positions_3d.csv')
             synced_pcd_skeleton.to_csv(saved_fp, index=True)
         
-    return synced_pcd_skeleton
+    if get_confidence_intervals:
+        return synced_pcd_skeleton, confidence_interval_df
+    else:
+        return synced_pcd_skeleton
         
 
 def select_points_randomly(
@@ -346,3 +360,72 @@ def obb_normalization(
     obb_normalized_joints = obb_normalized_joints.reshape((number_of_joints*3))
     
     return obb_normalized_points, obb_normalized_joints
+
+
+def transform_joints(
+    skeleton_df: pd.DataFrame, 
+    transformation: np.ndarray
+    ) -> pd.DataFrame:
+    '''
+    Take a 4x4 (rigid) transformation and apply to `skeleton_df`
+    '''
+    number_of_joints = len(skeleton_df.columns)//3
+    rotation = transformation[:3, :3]
+    translation = transformation[:3, 3]
+
+    # convert dataframe to a (n frames, k joints, 3) shaped data and then 
+    transformed_skeleton = skeleton_df.values.reshape(
+        (skeleton_df.shape[0], number_of_joints , 3)
+        )
+    transformed_skeleton = transformed_skeleton@np.linalg.inv(rotation) + translation
+
+    # transforming it back to the (n frames, k*3) shaped data
+    # columns: [joint_1x, joint_1y, joint_1z, joint_2x, ..., joint_kx, joint_ky, joint_kz]
+    transformed_skeleton = transformed_skeleton.reshape(
+        (skeleton_df.shape[0], number_of_joints*3)
+        )
+    transformed_skeleton = pd.DataFrame(columns=skeleton_df.columns, 
+                                        data=transformed_skeleton,
+                                        index=skeleton_df.index)
+
+    return transformed_skeleton
+
+
+def synchronize_joints(
+    root_dirs: List[str], 
+    transformations: Union[None, List[np.ndarray]], 
+    joint_names: List[str],
+    get_confidence_intervals: bool
+    ) -> List[pd.DataFrame]:
+    ''' 
+    Given a list of root_dirs (master_1/sub_1/sub_2/...), 
+    load all skeleton dataframes and apply their correspondent
+    registration transformations.
+    
+    Transformations are expected to be from master to sub, such as:
+        'transform_master_sub_1', 'transform_master_sub_2'
+    '''
+    joints_columns = np.concatenate([[name + ' (x)', name + ' (y)', name + ' (z)']  for name in joint_names])
+    confidence_columns = np.array([name + ' (c)' for name in joint_names])
+
+    synced_filenames = synchronize_filenames(root_dirs).dropna().astype(int)
+    skeleton_dfs = []
+    confidence_intervals = []
+    for i in range(len(root_dirs)):
+        device = synced_filenames.columns[i]
+        if get_confidence_intervals:
+            synced_joints_df, confidence_interval = sync_skeleton_and_pointcloud(root_dirs[i], get_confidence_intervals=True)
+            confidence_interval = confidence_interval[confidence_columns]
+            confidence_intervals.append(confidence_interval)
+        else:
+            synced_joints_df = sync_skeleton_and_pointcloud(root_dirs[i], get_confidence_intervals=False)
+        skeleton_df = synced_joints_df[joints_columns].loc[synced_filenames[device]]
+        if i > 0 and transformations[i-1] is not None:
+            skeleton_df = transform_joints(skeleton_df, transformations[i-1])
+        skeleton_dfs.append(skeleton_df)
+        
+    if get_confidence_intervals:
+        return skeleton_dfs, confidence_interval
+    else:
+        return skeleton_dfs
+        
