@@ -242,17 +242,17 @@ def sync_skeleton_and_pointcloud(
         skeleton_fp = os.path.join(root_dir, 'skeleton', 'positions_3d.csv')
         skeleton_df = pd.read_csv(skeleton_fp, sep=';')
         
-        if get_confidence_intervals:
-            confidence_interval_df = skeleton_df[[col for col in skeleton_df.columns \
-                if col.endswith('(c)') and col != 'body_idx']]
+        selected_joints_df = skeleton_df[[col for col in skeleton_df.columns if not col.endswith('(c)') and col != 'body_idx']]
 
-        skeleton_df = skeleton_df[[col for col in skeleton_df.columns \
-                                   if not col.endswith('(c)') and col != 'body_idx']]
-
-
-        synced_pcd_skeleton = pd.merge_asof(timestamps_df, skeleton_df, on='timestamp')
+        synced_pcd_skeleton = pd.merge_asof(timestamps_df, selected_joints_df, on='timestamp')
         synced_pcd_skeleton = synced_pcd_skeleton.dropna()
+        keep_index = synced_pcd_skeleton.index
         synced_pcd_skeleton = synced_pcd_skeleton.set_index('timestamp')
+        synced_pcd_skeleton_timestamps = synced_pcd_skeleton.index
+
+        confidence_interval_df = skeleton_df[[col for col in skeleton_df.columns if col.endswith('(c)') and col != 'body_idx']]
+        confidence_interval_df = confidence_interval_df.loc[keep_index]
+        confidence_interval_df.index = synced_pcd_skeleton_timestamps
     
         if save_csv:
             saved_fp = os.path.join(root_dir, 'skeleton', 'synced_positions_3d.csv')
@@ -262,6 +262,10 @@ def sync_skeleton_and_pointcloud(
         return synced_pcd_skeleton, confidence_interval_df
     else:
         return synced_pcd_skeleton
+
+        #if get_confidence_intervals:
+        #    confidence_interval_df = skeleton_df[[col for col in skeleton_df.columns \
+        #        if col.endswith('(c)') and col != 'body_idx']]
         
 
 def select_points_randomly(
@@ -416,17 +420,22 @@ def synchronize_joints(
     synced_filenames = synchronize_filenames(root_dirs).dropna().astype(int)
     skeleton_dfs = []
     confidence_intervals = []
+
     for i in range(len(root_dirs)):
         device = synced_filenames.columns[i]
+
         if get_confidence_intervals:
             synced_joints_df, confidence_interval = sync_skeleton_and_pointcloud(root_dirs[i], get_confidence_intervals=True)
-            confidence_interval = confidence_interval[confidence_columns]
+            confidence_interval = confidence_interval[confidence_columns].loc[synced_filenames[device]]
             confidence_intervals.append(confidence_interval)
         else:
             synced_joints_df = sync_skeleton_and_pointcloud(root_dirs[i], get_confidence_intervals=False)
+
         skeleton_df = synced_joints_df[joints_columns].loc[synced_filenames[device]]
+
         if i > 0 and transformations[i-1] is not None:
             skeleton_df = transform_joints(skeleton_df, transformations[i-1])
+
         skeleton_dfs.append(skeleton_df)
         
     if get_confidence_intervals:
