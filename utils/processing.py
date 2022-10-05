@@ -241,7 +241,7 @@ def sync_skeleton_and_pointcloud(
 
         skeleton_fp = os.path.join(root_dir, 'skeleton', 'positions_3d.csv')
         skeleton_df = pd.read_csv(skeleton_fp, sep=';')
-
+        
         if get_confidence_intervals:
             confidence_interval_df = skeleton_df[[col for col in skeleton_df.columns \
                 if col.endswith('(c)') and col != 'body_idx']]
@@ -396,7 +396,7 @@ def synchronize_joints(
     transformations: Union[None, List[np.ndarray]], 
     joint_names: List[str],
     get_confidence_intervals: bool
-    ) -> List[pd.DataFrame]:
+    ) -> Union[pd.DataFrame, List[pd.DataFrame]]:
     ''' 
     Given a list of root_dirs (master_1/sub_1/sub_2/...), 
     load all skeleton dataframes and apply their correspondent
@@ -404,6 +404,11 @@ def synchronize_joints(
     
     Transformations are expected to be from master to sub, such as:
         'transform_master_sub_1', 'transform_master_sub_2'
+
+    get_confidence_intervals will make this function return 
+    an additional point cloud with confidence intervals from
+    the body tracking SDK, with
+    1 =
     '''
     joints_columns = np.concatenate([[name + ' (x)', name + ' (y)', name + ' (z)']  for name in joint_names])
     confidence_columns = np.array([name + ' (c)' for name in joint_names])
@@ -425,7 +430,7 @@ def synchronize_joints(
         skeleton_dfs.append(skeleton_df)
         
     if get_confidence_intervals:
-        return skeleton_dfs, confidence_interval
+        return skeleton_dfs, confidence_intervals
     else:
         return skeleton_dfs
         
