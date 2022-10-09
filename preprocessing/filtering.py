@@ -93,3 +93,37 @@ class Filtering:
         mask_idx = np.argwhere(black_image != 255)
         img[mask_idx[:, 0], mask_idx[:, 1], mask_idx[:, 2]] = black_image[mask_idx[:, 0], mask_idx[:, 1], mask_idx[:, 2]]
         return img
+
+
+def kalman_filter(joint_vals: np.ndarray, ri=10, qi=10, fi=1/30, hi=1) -> np.ndarray:
+    ''' 
+    Kalman filtering used for correcting self-occlusions 
+
+    It is applied on a matrix of `joint_vals` with N observations and 3 dimensions, 
+    '''
+    
+    N = len(joint_vals)
+    
+    Pi = np.identity(3)
+    Fi = fi*np.identity(3)
+    Ri = ri*np.identity(3)
+    Qi = qi*np.identity(3)
+    Hi = hi*np.identity(3)
+    xhi = joint_vals[0]
+    
+    x_preds = [xhi]
+    for i in range(1, N):
+
+        # Prediction step:
+        xhdi = Fi@xhi
+        Pdi = Fi@Pi@Fi.T + Qi
+
+        # Update step:
+        Ki = Pdi@Hi.T@np.linalg.inv(Hi@Pdi@Hi.T + Ri)
+        xhi = xhdi + Ki@(joint_vals[i] - Hi@xhdi)
+        Pi = (np.identity(3) - Ki@Hi)@Pdi
+
+        x_preds.append(xhi)
+
+    x_preds = np.array(x_preds)
+    return x_preds
