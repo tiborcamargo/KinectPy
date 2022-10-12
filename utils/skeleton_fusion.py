@@ -32,6 +32,25 @@ def compute_threshold(
     return alpha
 
 
+def normalized_weight_of_frame(
+    confidence_dataframes: List[pd.DataFrame], 
+    valid_cameras: List[int], 
+    camera_idx: int,
+    frame: int
+    ) -> float:
+    ''' 
+    (Equation 9)
+    
+    Normalized weight of frame F_ct over ̈C_i^{..}
+    '''
+    sum_of_weights = 0
+    
+    for c in valid_cameras:
+        sum_of_weights += weight_of_frame(confidence_dataframes[c], frame)
+        
+    return weight_of_frame(confidence_dataframes[camera_idx], frame)/sum_of_weights
+
+
 def average_distance_between_joints(
     skeleton_dataframes: List[pd.DataFrame], 
     confidence_dataframes: List[pd.DataFrame], 
@@ -79,6 +98,9 @@ def joints_tracked_by_all_cameras(
 
 
 def weight_of_frame(confidence_dataframe: pd.DataFrame, frame: int):
+    '''
+    (Equation 2)
+    '''
     return np.sum(confidence_dataframe.iloc[frame])
 
 
@@ -111,7 +133,7 @@ def distance_between_joints(
     total_dist = 0
     for c1, c2 in camera_combinations:
         total_dist += np.linalg.norm(
-            skeleton_dfs[c1].iloc[frame][joint*3:(joint+1)*3] - skeleton_dfs[c2].iloc[frame][joint*3:(joint+1)*3]
+            skeleton_dataframes[c1].iloc[frame][joint*3:(joint+1)*3] - skeleton_dataframes[c2].iloc[frame][joint*3:(joint+1)*3]
         )
     total_dist = total_dist/num_combinations
     return total_dist
@@ -159,7 +181,7 @@ def distance_joints_to_centroid(
     Compute the distance of a single joint seen by all camera `camera_idx` 
     and the centroid
     '''
-    return np.linalg.norm(reshaped_skeletons[camera_idx][frame][joint] - theta_i) 
+    return np.linalg.norm(joints_per_camera[camera_idx][frame][joint] - centroids) 
 
 
 def find_center_joint(
@@ -189,7 +211,6 @@ def distance_all_joints_to_central_joint(
         dists.append(dist)
         
     return dists
-
 
 def placeholder():
     ''' Computes equation (5) in an efficient way, for all cameras and joints '''
