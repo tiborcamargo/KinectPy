@@ -443,3 +443,19 @@ def synchronize_joints(
     else:
         return skeleton_dfs
         
+
+def distance_between_joints(
+    skeleton_1: pd.DataFrame, 
+    skeleton_2: pd.DataFrame
+    ) -> np.ndarray:
+    ''' 
+    Given two skeleton dataframes of shape (N frames, 3*M joints), 
+    find the Euclidean distance between all joints of these skeletons.
+    It returns an array of shape (N frames, M joints), 
+    with the m-th column being the Euclidean distance of the m-th joint
+    '''
+    joints_1 = skeleton_1.values.reshape(skeleton_1.shape[0], -1, 3)
+    joints_2 = skeleton_2.values.reshape(skeleton_2.shape[0], -1, 3)
+    dist_joints = np.linalg.norm(joints_1 - joints_2, axis=2)
+    return dist_joints
+    
