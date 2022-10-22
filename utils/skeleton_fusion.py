@@ -71,7 +71,7 @@ def fuse_skeletons_gradient(
             weighted_average = (w1 * p1 + w2 * p2 + w3 * p3)/(w1 + w2 + w3)
             fused_joints[f, j] = weighted_average
 
-    return fused_joints, grads1, grads2, grads3
+    return fused_joints
 
 
 if __name__ == '__main__':
