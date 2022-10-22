@@ -12,14 +12,7 @@ np.set_printoptions(suppress=True)
 sys.path.append('..')
 
 from utils.processing import synchronize_filenames, synchronize_joints, select_points_randomly, distance_between_joints
-from utils.visualization import visualize_skeletons_2d
-from utils.skeleton_fusion import (
-    compute_centroid, compute_threshold, distance_joints_to_centroid,
-    distance_all_joints_to_central_joint, normalized_weight_of_frame
-)
-
 from PyMoCapViewer import MoCapViewer
-from itertools import combinations
 
 import logging
 logging.disable(logging.CRITICAL)
