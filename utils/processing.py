@@ -1,12 +1,12 @@
 import os
+import glob
 import copy
 import shutil
 import numpy as np
 import pandas as pd
 import open3d as o3d
 from typing import List, Tuple, Union
-
-from zmq import device
+from options.joints import LOWER_JOINTS, POSSIBLE_JOINTS
 
     
 def sort_filenames_by_timestamp(
@@ -219,54 +219,42 @@ def labels_from_csv(
     return skeleton
 
 
-def sync_skeleton_and_pointcloud(
-    root_dirs: Union[str, List[str]], 
-    get_confidence_intervals: bool = False,
-    save_csv: bool=False
-    ) -> Union[pd.DataFrame, List[pd.DataFrame]]:
-    """
-    Given a root dir, such as '/path/to/master_1', aligns timestamps for
-    the skeleton estimation file to the point clouds  
-    """
-    if type(root_dirs) == str:
-        root_dirs = [root_dirs]
+def sync_skeleton_and_pointcloud(device_dir: str, save_csv: bool = False):
+    '''
+    Given a root dir containing the following subfolders:
 
-    for root_dir in root_dirs:
-        color_dir = os.path.join(root_dir, 'color')
-        color_filenames = os.listdir(color_dir)
-        sorted_color_filenames = sort_filenames_by_timestamp(color_filenames)
-    
-        timestamps = [int(fn.split('_rgb.png')[0]) for fn in sorted_color_filenames]
-        timestamps_df = pd.DataFrame({'timestamp':timestamps})
+        /path/to/device_dir/color/, /path/to/root_dir/skeleton, ...
 
-        skeleton_fp = os.path.join(root_dir, 'skeleton', 'positions_3d.csv')
-        skeleton_df = pd.read_csv(skeleton_fp, sep=';')
-        
-        selected_joints_df = skeleton_df[[col for col in skeleton_df.columns if not col.endswith('(c)') and col != 'body_idx']]
+    Sync the names of the skeleton and point cloud files
+    '''
+    color_dir = os.path.join(device_dir, 'color')
+    color_filenames = os.listdir(color_dir)
+    sorted_color_filenames = sort_filenames_by_timestamp(color_filenames)
 
-        synced_pcd_skeleton = pd.merge_asof(timestamps_df, selected_joints_df, on='timestamp')
-        synced_pcd_skeleton = synced_pcd_skeleton.dropna()
-        keep_index = synced_pcd_skeleton.index
-        synced_pcd_skeleton = synced_pcd_skeleton.set_index('timestamp')
-        synced_pcd_skeleton_timestamps = synced_pcd_skeleton.index
+    timestamps = [int(fn.split('_rgb.png')[0]) for fn in sorted_color_filenames]
+    timestamps_df = pd.DataFrame({'timestamp': timestamps})
 
-        confidence_interval_df = skeleton_df[[col for col in skeleton_df.columns if col.endswith('(c)') and col != 'body_idx']]
-        confidence_interval_df = confidence_interval_df.loc[keep_index]
-        confidence_interval_df.index = synced_pcd_skeleton_timestamps
-    
-        if save_csv:
-            saved_fp = os.path.join(root_dir, 'skeleton', 'synced_positions_3d.csv')
-            synced_pcd_skeleton.to_csv(saved_fp, index=True)
-        
-    if get_confidence_intervals:
-        return synced_pcd_skeleton, confidence_interval_df
-    else:
-        return synced_pcd_skeleton
+    skeleton_fp = os.path.join(device_dir, 'skeleton', 'positions_3d.csv')
+    skeleton_df = pd.read_csv(os.path.abspath(skeleton_fp), sep=';')
+    skeleton_df = skeleton_df.astype({'body_idx':np.int64, 'timestamp':np.int64})
+    selected_joints_df = skeleton_df[
+        [col for col in skeleton_df.columns if not col.endswith('(c)') ]
+    ]
 
-        #if get_confidence_intervals:
-        #    confidence_interval_df = skeleton_df[[col for col in skeleton_df.columns \
-        #        if col.endswith('(c)') and col != 'body_idx']]
-        
+    synced_pcd_skeleton = pd.merge_asof(timestamps_df, selected_joints_df, on='timestamp')
+    synced_pcd_skeleton = synced_pcd_skeleton.dropna()
+    synced_pcd_skeleton = synced_pcd_skeleton.set_index('timestamp')
+
+    if save_csv:
+        saved_fp = os.path.join(
+            os.path.abspath(device_dir),
+            'skeleton',
+            'synced_positions_3d.csv'
+        )
+        synced_pcd_skeleton.to_csv(saved_fp, index=True)
+
+    return synced_pcd_skeleton
+
 
 def select_points_randomly(
     pointcloud: o3d.geometry.PointCloud, 
@@ -396,52 +384,49 @@ def transform_joints(
 
 
 def synchronize_joints(
-    root_dirs: List[str], 
-    transformations: Union[None, List[np.ndarray]], 
-    joint_names: List[str],
-    get_confidence_intervals: bool
-    ) -> Union[pd.DataFrame, List[pd.DataFrame]]:
-    ''' 
-    Given a list of root_dirs (master_1/sub_1/sub_2/...), 
-    load all skeleton dataframes and apply their correspondent
-    registration transformations.
-    
-    Transformations are expected to be from master to sub, such as:
-        'transform_master_sub_1', 'transform_master_sub_2'
-
-    get_confidence_intervals will make this function return 
-    an additional point cloud with confidence intervals from
-    the body tracking SDK, with
-    1 =
+    root_dir: str,
+    body_idx: List[int] = None,
+    joint_names: List[str] = LOWER_JOINTS,
+    save: bool = False
+    ) -> List[pd.DataFrame]:
     '''
-    joints_columns = np.concatenate([[name + ' (x)', name + ' (y)', name + ' (z)']  for name in joint_names])
-    confidence_columns = np.array([name + ' (c)' for name in joint_names])
+    Given a root dir containing the following subfolders:
 
-    synced_filenames = synchronize_filenames(root_dirs).dropna().astype(int)
+    /path/to/root_dir/master_1/, /path/to/root_dir/sub_1, /path/to/root_dir/sub_2, ... 
+    ...
+
+    Apply all correspondent registation transformations and save 
+    a new registered_positions_3d.csv
+    '''
+    device_dirs = glob.glob(os.path.join(root_dir, '*_*'))
+    number_of_devices = len(device_dirs)
+    if body_idx == None:
+        body_idx = [1 for i in range(number_of_devices)]
+
+    device_dirs = glob.glob(os.path.join(root_dir, '*_*'))
+    joints_columns = np.concatenate([[name + ' (x)', name + ' (y)', name + ' (z)'] for name in joint_names])
+    synced_filenames = synchronize_filenames(device_dirs).dropna().astype(int)
+
     skeleton_dfs = []
-    confidence_intervals = []
-
-    for i in range(len(root_dirs)):
+    for i in range(len(device_dirs)):
         device = synced_filenames.columns[i]
 
-        if get_confidence_intervals:
-            synced_joints_df, confidence_interval = sync_skeleton_and_pointcloud(root_dirs[i], get_confidence_intervals=True)
-            confidence_interval = confidence_interval[confidence_columns].loc[synced_filenames[device]]
-            confidence_intervals.append(confidence_interval)
-        else:
-            synced_joints_df = sync_skeleton_and_pointcloud(root_dirs[i], get_confidence_intervals=False)
+        synced_joints_df = sync_skeleton_and_pointcloud(device_dirs[i],
+                                                        body_idx=body_idx[i])
 
         skeleton_df = synced_joints_df[joints_columns].loc[synced_filenames[device]]
 
-        if i > 0 and transformations[i-1] is not None:
-            skeleton_df = transform_joints(skeleton_df, transformations[i-1])
+        if i > 0:
+            trafo_fp = os.path.join(root_dir, 'master_1', 'transformation_master_' + device + '.npy')
+            transformation = np.load(trafo_fp)
+            skeleton_df = transform_joints(skeleton_df, transformation)
 
+        if save:
+            dst = os.path.join(root_dir, 'master_1', 'skeleton', 'registered_positions_3d.csv')
+            skeleton_df.to_csv(dst)
         skeleton_dfs.append(skeleton_df)
-        
-    if get_confidence_intervals:
-        return skeleton_dfs, confidence_intervals
-    else:
-        return skeleton_dfs
+
+    return skeleton_dfs
         
 
 def distance_between_joints(
@@ -458,4 +443,20 @@ def distance_between_joints(
     joints_2 = skeleton_2.values.reshape(skeleton_2.shape[0], -1, 3)
     dist_joints = np.linalg.norm(joints_1 - joints_2, axis=2)
     return dist_joints
-    
+
+def select_skeleton_points_given_joint_names(
+    points: np.ndarray,
+    joints: List[str],
+    ) -> np.ndarray:
+    '''
+    Given a flat array of size 32*3, containing all 32 points
+    for each joint, select only the selected joints based
+    on their names
+    '''
+    reshaped_points = points.reshape(len(POSSIBLE_JOINTS), 3)
+    selected_points = []
+    for i in range(len(POSSIBLE_JOINTS)):
+        if POSSIBLE_JOINTS[i] in joints:
+            selected_points.append(reshaped_points[i])
+    selected_points = np.array(selected_points).flatten()
+    return selected_points
