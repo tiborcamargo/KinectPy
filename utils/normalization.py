@@ -184,5 +184,5 @@ def scale(x, y):
 @tf.function(input_signature=[tf.TensorSpec(shape=(None, None, 3)), tf.TensorSpec(shape=(None, None))])
 def rotate(x, y):
     """ Rotation around the y-axis """
-    x, y = tf.numpy_function(rotate_pcd, [x, y], (tf.double, tf.double))
+    x, y = tf.numpy_function(rotate_points_and_joints, [x, y], (tf.double, tf.double))
     return x, y
