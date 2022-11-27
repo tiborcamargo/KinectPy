@@ -126,6 +126,38 @@ def translation_normalization_batch(x, y):
     return obb_points, obb_joints
 
 
+def scale_batch(x, y, scale=1/1000):
+    scaled_points = []
+    scaled_joints = []
+    for batch_idx in range(x.shape[0]):
+        scaled_points.append(x[batch_idx] * scale)
+        scaled_joints.append(y[batch_idx] * scale)
+
+    scaled_points = np.array(scaled_points)
+    scaled_joints = np.array(scaled_joints)
+
+    return scaled_points, scaled_joints
+
+
+def rotate_points_and_joints(x, y):
+    degs = np.random.randint(360)
+    rotation = R.from_euler('y', degs, degrees=True).as_matrix()
+
+    rotated_points = []
+    rotated_joints = []
+    for i in range(x.shape[0]):
+        rotated_point = x[i] @ rotation
+        rotated_joint = y[i].reshape(-1, 3) @ rotation  # from (3*K joints) to (K joints, 3)
+        rotated_joint = rotated_joint.reshape(1, -1)[0]  # from (K joints, 3) to (3*K joints) again
+
+        rotated_points.append(rotated_point)
+        rotated_joints.append(rotated_joint)
+
+    rotated_points = np.array(rotated_points)
+    rotated_joints = np.array(rotated_joints)
+    return rotated_points, rotated_joints
+
+
 @tf.function(input_signature=[tf.TensorSpec(shape=(None, None, 3)), tf.TensorSpec(shape=(None, None))])
 def normalize_obb(x, y):
     x, y = tf.numpy_function(obb_normalization_batch, [x, y], (tf.double, tf.double))
@@ -141,4 +173,16 @@ def normalize_obb_rotation_translation(x, y):
 @tf.function(input_signature=[tf.TensorSpec(shape=(None, None, 3)), tf.TensorSpec(shape=(None, None))])
 def translate(x, y):
     x, y = tf.numpy_function(translation_normalization_batch, [x, y], (tf.double, tf.double))
+    return x, y
+
+@tf.function(input_signature=[tf.TensorSpec(shape=(None, None, 3)), tf.TensorSpec(shape=(None, None))])
+def scale(x, y):
+    x, y = tf.numpy_function(scale_batch, [x, y], (tf.float64, tf.float64))
+    return x, y
+
+
+@tf.function(input_signature=[tf.TensorSpec(shape=(None, None, 3)), tf.TensorSpec(shape=(None, None))])
+def rotate(x, y):
+    """ Rotation around the y-axis """
+    x, y = tf.numpy_function(rotate_pcd, [x, y], (tf.double, tf.double))
     return x, y
