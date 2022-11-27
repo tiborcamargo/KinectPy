@@ -139,7 +139,7 @@ def scale_batch(x, y, scale=1/1000):
     return scaled_points, scaled_joints
 
 
-def rotate_points_and_joints(x, y):
+def rotate_batch(x, y):
     degs = np.random.randint(360)
     rotation = R.from_euler('y', degs, degrees=True).as_matrix()
 
@@ -184,5 +184,5 @@ def scale(x, y):
 @tf.function(input_signature=[tf.TensorSpec(shape=(None, None, 3)), tf.TensorSpec(shape=(None, None))])
 def rotate(x, y):
     """ Rotation around the y-axis """
-    x, y = tf.numpy_function(rotate_points_and_joints, [x, y], (tf.double, tf.double))
+    x, y = tf.numpy_function(rotate_batch, [x, y], (tf.double, tf.double))
     return x, y
