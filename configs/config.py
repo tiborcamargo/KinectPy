@@ -19,6 +19,8 @@ _C.DATA = CN()
 _C.DATA.JOINTS = LOWER_JOINTS
 _C.DATA.SAMPLING_POINTS = 1024
 _C.DATA.NORMALIZATION = ''
+_C.DATA.TRANSLATION = True
+_C.DATA.SCALE = 1
 
 # Training parameters
 _C.TRAIN = CN()
@@ -30,7 +32,7 @@ _C.TRAIN.LOSS = 'mean_squared_error'
 # Evaluation parameters
 _C.EVAL = CN()
 _C.EVAL.METRICS = 'percentual_correct_keypoints'
-_C.EVAL.THRESHOLDS = 50.
+_C.EVAL.THRESHOLDS = 0.050
 
 
 def get_default_config(parser=None):
